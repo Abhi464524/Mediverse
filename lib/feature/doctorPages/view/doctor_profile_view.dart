@@ -3,6 +3,7 @@ import 'package:doctor_app/common/services/storage_service.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'working_hours_view.dart';
+import 'dart:io';
 
 class DoctorProfilePage extends StatefulWidget {
   final String name;
@@ -21,6 +22,7 @@ class DoctorProfilePage extends StatefulWidget {
 
 class _DoctorProfilePageState extends State<DoctorProfilePage> {
   String _selectedLanguage = 'English';
+  File? _profileImageFile;
   final List<String> _languages = [
     'English',
     'Hindi (हिंदी)',
@@ -33,6 +35,7 @@ class _DoctorProfilePageState extends State<DoctorProfilePage> {
   void initState() {
     super.initState();
     _loadPreferences();
+    _loadSavedProfileImage();
   }
 
   Future<void> _loadPreferences() async {
@@ -51,6 +54,27 @@ class _DoctorProfilePageState extends State<DoctorProfilePage> {
         _selectedLanguage = 'English';
       }
     });
+  }
+
+  String _profileImageKey(String username) => "doctor_profile_image_$username";
+
+  Future<void> _loadSavedProfileImage() async {
+    try {
+      final storage = await StorageService.getInstance();
+      final profile = await storage.getCurrentUserProfile();
+      final username = profile?['username'];
+      if (username == null || username.isEmpty) return;
+      final savedPath = storage.getString(_profileImageKey(username));
+      if (savedPath == null || savedPath.isEmpty) return;
+      final file = File(savedPath);
+      if (!file.existsSync()) return;
+      if (!mounted) return;
+      setState(() {
+        _profileImageFile = file;
+      });
+    } catch (_) {
+      // Ignore failures and keep placeholder avatar.
+    }
   }
 
   void _showLanguageSelector() {
@@ -154,12 +178,6 @@ class _DoctorProfilePageState extends State<DoctorProfilePage> {
         "action": "workingHours",
         "subtitle": "working_hours_desc".tr
       },
-      {
-        "name": "payment_methods".tr,
-        "icon": Icons.payments_outlined,
-        "action": "paymentMethods",
-        "subtitle": "payment_methods_desc".tr
-      },
     ];
 
     final List<Map<String, dynamic>> legalItems = [
@@ -185,6 +203,12 @@ class _DoctorProfilePageState extends State<DoctorProfilePage> {
         "name": "logout".tr,
         "icon": Icons.logout,
         "action": "logout",
+        "isDestructive": true
+      },
+      {
+        "name": "Delete account",
+        "icon": Icons.delete_forever_outlined,
+        "action": "deleteAccount",
         "isDestructive": true
       },
     ];
@@ -234,117 +258,244 @@ class _DoctorProfilePageState extends State<DoctorProfilePage> {
     bool _obscureNew = true;
     bool _obscureConfirm = true;
 
-    showDialog(
+    showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
       builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: Text('change_password'.tr,
-              style: const TextStyle(
-                  fontWeight: FontWeight.bold, color: Color(0xFF6A9C89))),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: currentPasswordController,
-                  obscureText: _obscureCurrent,
-                  decoration: InputDecoration(
-                    labelText: 'current_password'.tr,
-                    suffixIcon: IconButton(
-                      icon: Icon(_obscureCurrent
-                          ? Icons.visibility_off
-                          : Icons.visibility),
-                      onPressed: () => setDialogState(
-                          () => _obscureCurrent = !_obscureCurrent),
+        builder: (context, setDialogState) => SafeArea(
+          child: Padding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(context).viewInsets.bottom,
+            ),
+            child: Container(
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
+              ),
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 44,
+                    height: 5,
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade300,
+                      borderRadius: BorderRadius.circular(10),
                     ),
                   ),
-                ),
-                TextField(
-                  controller: newPasswordController,
-                  obscureText: _obscureNew,
-                  decoration: InputDecoration(
-                    labelText: 'new_password'.tr,
-                    suffixIcon: IconButton(
-                      icon: Icon(_obscureNew
-                          ? Icons.visibility_off
-                          : Icons.visibility),
-                      onPressed: () =>
-                          setDialogState(() => _obscureNew = !_obscureNew),
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF2F7F5),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(Icons.lock_outline,
+                            color: Color(0xFF6A9C89)),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'change_password'.tr,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black87,
+                            fontSize: 18,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  _buildPasswordField(
+                    controller: currentPasswordController,
+                    label: 'current_password'.tr,
+                    obscureText: _obscureCurrent,
+                    icon: Icons.lock_clock_outlined,
+                    onToggle: () => setDialogState(
+                      () => _obscureCurrent = !_obscureCurrent,
                     ),
                   ),
-                ),
-                TextField(
-                  controller: confirmPasswordController,
-                  obscureText: _obscureConfirm,
-                  decoration: InputDecoration(
-                    labelText: 'confirm_password'.tr,
-                    suffixIcon: IconButton(
-                      icon: Icon(_obscureConfirm
-                          ? Icons.visibility_off
-                          : Icons.visibility),
-                      onPressed: () => setDialogState(
-                          () => _obscureConfirm = !_obscureConfirm),
+                  const SizedBox(height: 12),
+                  _buildPasswordField(
+                    controller: newPasswordController,
+                    label: 'new_password'.tr,
+                    obscureText: _obscureNew,
+                    icon: Icons.lock_reset_outlined,
+                    onToggle: () => setDialogState(
+                      () => _obscureNew = !_obscureNew,
                     ),
                   ),
-                ),
-              ],
+                  const SizedBox(height: 12),
+                  _buildPasswordField(
+                    controller: confirmPasswordController,
+                    label: 'confirm_password'.tr,
+                    obscureText: _obscureConfirm,
+                    icon: Icons.verified_user_outlined,
+                    onToggle: () => setDialogState(
+                      () => _obscureConfirm = !_obscureConfirm,
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () => Get.back(),
+                          style: OutlinedButton.styleFrom(
+                            side: BorderSide(color: Colors.grey.shade300),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                          ),
+                          child: Text(
+                            'cancel'.tr,
+                            style: const TextStyle(color: Colors.black54),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () async {
+                            final current = currentPasswordController.text.trim();
+                            final newPass = newPasswordController.text.trim();
+                            final confirm =
+                                confirmPasswordController.text.trim();
+
+                            if (current.isEmpty ||
+                                newPass.isEmpty ||
+                                confirm.isEmpty) {
+                              Get.snackbar('Error', 'Please fill all fields',
+                                  snackPosition: SnackPosition.TOP,
+                                  backgroundColor: Colors.red.shade100,
+                                  colorText: Colors.red.shade900);
+                              return;
+                            }
+
+                            if (newPass != confirm) {
+                              Get.snackbar('Error',
+                                  'New password and confirm password must be same',
+                                  snackPosition: SnackPosition.TOP,
+                                  backgroundColor: Colors.red.shade100,
+                                  colorText: Colors.red.shade900);
+                              return;
+                            }
+
+                            final storage = await StorageService.getInstance();
+                            final isCurrentCorrect =
+                                await storage.verifyCurrentPassword(current);
+
+                            if (!isCurrentCorrect) {
+                              Get.snackbar(
+                                  'Error', 'Current password is incorrect',
+                                  snackPosition: SnackPosition.TOP,
+                                  backgroundColor: Colors.red.shade100,
+                                  colorText: Colors.red.shade900);
+                              return;
+                            }
+
+                            final success = await storage.updatePassword(newPass);
+                            if (success) {
+                              Get.back();
+                              Get.snackbar(
+                                  'success'.tr, 'password_updated_success'.tr,
+                                  backgroundColor: const Color(0xFFC4DAD2),
+                                  colorText: Colors.black87);
+                            }
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF6A9C89),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                          ),
+                          child: Text('update'.tr,
+                              style: const TextStyle(color: Colors.white)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Get.back(),
-              child:
-                  Text('cancel'.tr, style: const TextStyle(color: Colors.grey)),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                final current = currentPasswordController.text.trim();
-                final newPass = newPasswordController.text.trim();
-                final confirm = confirmPasswordController.text.trim();
-
-                if (current.isEmpty || newPass.isEmpty || confirm.isEmpty) {
-                  return;
-                }
-
-                if (newPass != confirm) {
-                  Get.snackbar('error'.tr, 'passwords_dont_match'.tr,
-                      backgroundColor: Colors.red.shade100,
-                      colorText: Colors.red.shade900);
-                  return;
-                }
-
-                final storage = await StorageService.getInstance();
-                final isCurrentCorrect =
-                    await storage.verifyCurrentPassword(current);
-
-                if (!isCurrentCorrect) {
-                  Get.snackbar('error'.tr, 'incorrect_current_password'.tr,
-                      backgroundColor: Colors.red.shade100,
-                      colorText: Colors.red.shade900);
-                  return;
-                }
-
-                final success = await storage.updatePassword(newPass);
-                if (success) {
-                  Get.back();
-                  Get.snackbar('success'.tr, 'password_updated_success'.tr,
-                      backgroundColor: const Color(0xFFC4DAD2),
-                      colorText: Colors.black87);
-                }
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF6A9C89),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
-              child: Text('update'.tr,
-                  style: const TextStyle(color: Colors.white)),
-            ),
-          ],
         ),
+      ),
+    );
+  }
+
+  Future<void> _confirmDeleteAccount() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete account'),
+        content: const Text(
+          'This will permanently delete your account and local data on this device.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.red.shade400),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true) return;
+    final storage = await StorageService.getInstance();
+    final deleted = await storage.deleteCurrentAccount();
+    if (!mounted) return;
+    if (deleted) {
+      Get.offAll(() => const userSelectionPage());
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to delete account.')),
+      );
+    }
+  }
+
+  Widget _buildPasswordField({
+    required TextEditingController controller,
+    required String label,
+    required bool obscureText,
+    required IconData icon,
+    required VoidCallback onToggle,
+  }) {
+    return TextField(
+      controller: controller,
+      obscureText: obscureText,
+      decoration: InputDecoration(
+        labelText: label,
+        prefixIcon: Icon(icon, color: const Color(0xFF6A9C89)),
+        suffixIcon: IconButton(
+          icon: Icon(obscureText ? Icons.visibility_off : Icons.visibility),
+          onPressed: onToggle,
+        ),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide(color: Colors.grey.shade300),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide(color: Colors.grey.shade300),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: Color(0xFF6A9C89), width: 1.8),
+        ),
+        filled: true,
+        fillColor: const Color(0xFFF8FBF9),
       ),
     );
   }
@@ -370,7 +521,11 @@ class _DoctorProfilePageState extends State<DoctorProfilePage> {
           child: CircleAvatar(
             radius: 50,
             backgroundColor: const Color(0xFFC4DAD2),
-            child: Icon(Icons.person, size: 60, color: Colors.white),
+            backgroundImage:
+                _profileImageFile != null ? FileImage(_profileImageFile!) : null,
+            child: _profileImageFile == null
+                ? Icon(Icons.person, size: 60, color: Colors.white)
+                : null,
           ),
         ),
         SizedBox(height: 16),
@@ -511,6 +666,9 @@ class _DoctorProfilePageState extends State<DoctorProfilePage> {
                               storage.clearSession();
                               Get.offAll(() => const userSelectionPage());
                             });
+                            break;
+                          case "deleteAccount":
+                            _confirmDeleteAccount();
                             break;
                           case "language":
                             _showLanguageSelector();

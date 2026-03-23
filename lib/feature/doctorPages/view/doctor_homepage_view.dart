@@ -4,6 +4,7 @@ import 'package:doctor_app/feature/doctorPages/view/patient_details_view.dart';
 import 'package:doctor_app/feature/doctorPages/model/patient_model.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'dart:io';
 import '../../../common/services/storage_service.dart';
 import '../model/appointment_model.dart';
 import 'appointments_view.dart';
@@ -24,6 +25,7 @@ class _DoctorHomePageState extends State<DoctorHomePage> {
   String doctorName = "";
   String? doctorSpecialization = "";
   final Map<String, String> _persistedStatuses = {};
+  File? _profileImageFile;
 
   final List<AppointmentModel> appointments = [
     AppointmentModel(
@@ -87,8 +89,8 @@ class _DoctorHomePageState extends State<DoctorHomePage> {
     return app.status;
   }
 
-  _editDoctorProfile() {
-    Get.to(() => EditDoctorProfileView(
+  Future<void> _editDoctorProfile() async {
+    await Get.to(() => EditDoctorProfileView(
           currentName: doctorName.replaceAll('Dr. ', ''),
           currentSpecialization: doctorSpecialization ?? "",
           onSave: (newName, newSpecialization) {
@@ -98,6 +100,7 @@ class _DoctorHomePageState extends State<DoctorHomePage> {
             });
           },
         ));
+    await _loadProfileImageFromStorage();
   }
 
   @override
@@ -106,7 +109,29 @@ class _DoctorHomePageState extends State<DoctorHomePage> {
     doctorName = "Dr. ${widget.name}";
     doctorSpecialization = widget.speciality ?? "";
     _loadDoctorProfileFromStorage();
+    _loadProfileImageFromStorage();
     _loadPersistedStatuses();
+  }
+
+  String _profileImageKey(String username) => "doctor_profile_image_$username";
+
+  Future<void> _loadProfileImageFromStorage() async {
+    try {
+      final storage = await StorageService.getInstance();
+      final profile = await storage.getCurrentUserProfile();
+      final username = profile?['username'];
+      if (username == null || username.isEmpty) return;
+      final savedPath = storage.getString(_profileImageKey(username));
+      if (savedPath == null || savedPath.isEmpty) return;
+      final file = File(savedPath);
+      if (!file.existsSync()) return;
+      if (!mounted) return;
+      setState(() {
+        _profileImageFile = file;
+      });
+    } catch (_) {
+      // Ignore storage/file issues and keep icon fallback.
+    }
   }
 
   Future<void> _loadDoctorProfileFromStorage() async {
@@ -202,8 +227,14 @@ class _DoctorHomePageState extends State<DoctorHomePage> {
                       onEditProfile: _editDoctorProfile,
                     ));
                   },
-                  icon: Icon(Icons.person,
-                      color: const Color(0xFF6A9C89))), // Sage Green
+                  icon: _profileImageFile != null
+                      ? CircleAvatar(
+                          radius: 16,
+                          backgroundImage: FileImage(_profileImageFile!),
+                          backgroundColor: const Color(0xFFC4DAD2),
+                        )
+                      : Icon(Icons.person,
+                          color: const Color(0xFF6A9C89))), // Sage Green
               IconButton(
                   onPressed: () {
                     Get.to(DoctorNotificationsPage());
@@ -439,21 +470,30 @@ class _DoctorHomePageState extends State<DoctorHomePage> {
                       final isPending = status == 'Pending';
                       return GestureDetector(
                         onTap: () async {
-                          final patient = PatientModel(
-                            id: appointment.id,
-                            name: appointment.patientName,
-                            age: "35", // Default/Dummy
-                            gender: "Male", // Default/Dummy
-                            contact: "+1 234-567-8900",
-                            email: "patient@email.com",
-                            address: "123 Main St",
-                            bloodGroup: "O+",
-                            diagnosis: appointment.diagnosis,
-                            medicalHistory: "None",
-                            currentMedications: "None",
-                            allergies: "None",
-                            lastVisit: "2024-01-01",
-                            symptoms: "Checkup",
+                          final patient = NewPatientResponse(
+                            patientId: appointment.id,
+                            profile: Profile(
+                              name: appointment.patientName,
+                              age: "35",
+                              gender: "Male",
+                              bloodGroup: "O+",
+                            ),
+                            contact: Contact(
+                              phone: "+1 234-567-8900",
+                              email: "patient@email.com",
+                              address: "123 Main St",
+                            ),
+                            appointment: Appointment(
+                              diagnosis: appointment.diagnosis,
+                              scheduledTime: appointment.time,
+                              symptoms: "Checkup",
+                            ),
+                            medicalHistory: MedicalHistory(
+                              historyNotes: "None",
+                              currentMedications: "None",
+                              allergies: "None",
+                              lastVisitDate: "2024-01-01",
+                            ),
                           );
                           await Get.to(() => PatientDetails(
                                 patient: patient,
@@ -1004,29 +1044,7 @@ class _DoctorHomePageState extends State<DoctorHomePage> {
                     ),
                   ],
                 ),
-                SizedBox(height: 16),
-                Container(
-                  padding: EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.currency_rupee, color: Colors.white, size: 20),
-                      Text(
-                        "${'revenue'.tr}: ₹${revenue.toString()}",
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+               ],
             ),
           ),
         ],

@@ -5,6 +5,8 @@ import 'package:doctor_app/feature/doctorPages/model/patient_model.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:get/get.dart';
+import '../controller/patient_controller.dart';
+import '../../../common/utils/phone_launcher.dart' show launchCallWithLoader;
 import '../../../common/services/storage_service.dart';
 
 class AppointmentsPage extends StatefulWidget {
@@ -25,7 +27,13 @@ class AppointmentsPage extends StatefulWidget {
 }
 
 class AppointmentsPageState extends State<AppointmentsPage> {
+  final PatientController _patientController = Get.put(PatientController());
   final Map<String, String> _persistedStatuses = {};
+  static const String _hardcodedPhoneNumber = "+91 7900464524";
+
+  Future<void> _callHardcodedNumber() async {
+    await launchCallWithLoader(context, _hardcodedPhoneNumber);
+  }
 
   DateTime _parseTime(String timeStr) {
     if (timeStr.isEmpty) return DateTime.now();
@@ -140,6 +148,9 @@ class AppointmentsPageState extends State<AppointmentsPage> {
 
   void _addPatients() {
     TextEditingController nameController = TextEditingController();
+    TextEditingController ageController = TextEditingController();
+    TextEditingController genderController = TextEditingController();
+    TextEditingController contactController = TextEditingController();
     TextEditingController timeController = TextEditingController();
     TextEditingController diagnosisController = TextEditingController();
 
@@ -149,6 +160,7 @@ class AppointmentsPageState extends State<AppointmentsPage> {
         context: context,
         builder: (context) => AlertDialog(
               backgroundColor: Colors.white,
+              insetPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 40),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(24),
                 side: BorderSide(
@@ -164,69 +176,118 @@ class AppointmentsPageState extends State<AppointmentsPage> {
                 ),
               ),
               content: Container(
-                width: double.maxFinite,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _buildDialogTextField(
-                        nameController, "Patient Name", Icons.person),
-                    SizedBox(height: 16),
-                    _buildDialogTextField(
-                        timeController, "Appointment Time", Icons.access_time),
-                    SizedBox(height: 16),
-                    _buildDialogTextField(diagnosisController, "Diagnosis",
-                        Icons.monitor_heart_outlined),
-                    SizedBox(height: 24),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextButton(
-                              onPressed: () => Navigator.pop(context),
-                              style: TextButton.styleFrom(
-                                foregroundColor: Colors.grey,
-                                padding: EdgeInsets.symmetric(vertical: 12),
-                              ),
-                              child: Text("Cancel",
-                                  style: TextStyle(
-                                      fontFamily: 'Poppins',
-                                      fontWeight: FontWeight.w600))),
-                        ),
-                        SizedBox(width: 12),
-                        Expanded(
-                          child: ElevatedButton(
-                              onPressed: () {
-                                if (nameController.text.isNotEmpty &&
-                                    timeController.text.isNotEmpty) {
-                                  setState(() {
-                                    appointments.add(AppointmentModel(
-                                      id: DateTime.now()
-                                          .millisecondsSinceEpoch
-                                          .toString(),
-                                      patientName: nameController.text,
-                                      time: timeController.text,
-                                      diagnosis: diagnosisController.text,
-                                    ));
-                                  });
-                                  Navigator.pop(context);
-                                }
-                              },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor:
-                                    const Color(0xFF6A9C89), // Sage Green
-                                foregroundColor: Colors.white,
-                                padding: EdgeInsets.symmetric(vertical: 12),
-                                shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12)),
-                                elevation: 0,
-                              ),
-                              child: Text("Add",
-                                  style: TextStyle(
-                                      fontFamily: 'Poppins',
-                                      fontWeight: FontWeight.bold))),
-                        ),
-                      ],
-                    )
-                  ],
+                width: MediaQuery.of(context).size.width * 0.9,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _buildDialogTextField(
+                          nameController, "Patient Name", Icons.person),
+                      SizedBox(height: 16),
+                      Row(
+                        children: [
+                          Expanded(
+                              child: _buildDialogTextField(
+                                  ageController, "Age", Icons.calendar_today)),
+                          SizedBox(width: 12),
+                          Expanded(
+                              child: _buildDialogTextField(
+                                  genderController, "Gender", Icons.wc)),
+                        ],
+                      ),
+                      SizedBox(height: 16),
+                      _buildDialogTextField(
+                          contactController, "Contact Number", Icons.phone),
+                      SizedBox(height: 16),
+                      _buildDialogTextField(timeController,
+                          "Appointment Time", Icons.access_time),
+                      SizedBox(height: 16),
+                      _buildDialogTextField(diagnosisController, "Diagnosis",
+                          Icons.monitor_heart_outlined),
+                      SizedBox(height: 24),
+                      Obx(() => Row(
+                        children: [
+                          Expanded(
+                            child: TextButton(
+                                onPressed: () => Navigator.pop(context),
+                                style: TextButton.styleFrom(
+                                  foregroundColor: Colors.grey,
+                                  padding: EdgeInsets.symmetric(vertical: 12),
+                                ),
+                                child: Text("Cancel",
+                                    style: TextStyle(
+                                        fontFamily: 'Poppins',
+                                        fontWeight: FontWeight.w600))),
+                          ),
+                          SizedBox(width: 12),
+                          Expanded(
+                            child: ElevatedButton(
+                                onPressed: _patientController.isLoading.value
+                                    ? null
+                                    : () async {
+                                        if (nameController.text.isNotEmpty &&
+                                            timeController.text.isNotEmpty) {
+                                          final newPatient = NewPatientResponse(
+                                            patientId: DateTime.now()
+                                                .millisecondsSinceEpoch
+                                                .toString(),
+                                            profile: Profile(
+                                              name: nameController.text,
+                                              age: ageController.text,
+                                              gender: genderController.text,
+                                            ),
+                                            contact: Contact(
+                                              phone: contactController.text,
+                                            ),
+                                            appointment: Appointment(
+                                              scheduledTime: timeController.text,
+                                              diagnosis: diagnosisController.text,
+                                            ),
+                                          );
+
+                                          final success = await _patientController
+                                              .addPatient(newPatient);
+
+                                          if (success) {
+                                            setState(() {
+                                              appointments.add(AppointmentModel(
+                                                id: newPatient.patientId ?? '',
+                                                patientName: newPatient.profile?.name ?? '',
+                                                time: timeController.text,
+                                                diagnosis: newPatient.appointment?.diagnosis ?? '',
+                                              ));
+                                            });
+                                            Navigator.pop(context);
+                                          }
+                                        }
+                                      },
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor:
+                                      const Color(0xFF6A9C89), // Sage Green
+                                  foregroundColor: Colors.white,
+                                  padding: EdgeInsets.symmetric(vertical: 12),
+                                  shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12)),
+                                  elevation: 0,
+                                ),
+                                child: _patientController.isLoading.value
+                                    ? SizedBox(
+                                        height: 20,
+                                        width: 20,
+                                        child: CircularProgressIndicator(
+                                          color: Colors.white,
+                                          strokeWidth: 2,
+                                        ),
+                                      )
+                                    : Text("Add",
+                                        style: TextStyle(
+                                            fontFamily: 'Poppins',
+                                            fontWeight: FontWeight.bold))),
+                          ),
+                        ],
+                      ))
+                    ],
+                  ),
                 ),
               ),
             ));
@@ -427,21 +488,30 @@ class AppointmentsPageState extends State<AppointmentsPage> {
                               onPressed: () async {
                                 // Create a dummy PatientModel for navigation since we don't have full details here
                                 // In a real app, you might fetch details by ID
-                                final patient = PatientModel(
-                                  id: appointment.id,
-                                  name: appointment.patientName,
-                                  age: "35", // Default/Dummy
-                                  gender: "Male", // Default/Dummy
-                                  contact: "+1 234-567-8900",
-                                  email: "patient@email.com",
-                                  address: "123 Main St",
-                                  bloodGroup: "O+",
-                                  diagnosis: appointment.diagnosis,
-                                  medicalHistory: "None",
-                                  currentMedications: "None",
-                                  allergies: "None",
-                                  lastVisit: "2024-01-01",
-                                  symptoms: "Checkup",
+                                final patient = NewPatientResponse(
+                                  patientId: appointment.id,
+                                  profile: Profile(
+                                    name: appointment.patientName,
+                                    age: "35",
+                                    gender: "Male",
+                                    bloodGroup: "O+",
+                                  ),
+                                  contact: Contact(
+                                    phone: "+1 234-567-8900",
+                                    email: "patient@email.com",
+                                    address: "123 Main St",
+                                  ),
+                                  appointment: Appointment(
+                                    diagnosis: appointment.diagnosis,
+                                    scheduledTime: appointment.time,
+                                    symptoms: "Checkup",
+                                  ),
+                                  medicalHistory: MedicalHistory(
+                                    historyNotes: "None",
+                                    currentMedications: "None",
+                                    allergies: "None",
+                                    lastVisitDate: "2024-01-01",
+                                  ),
                                 );
 
                                 await Get.to(() => PatientDetails(
@@ -494,10 +564,7 @@ class AppointmentsPageState extends State<AppointmentsPage> {
                             Row(
                               children: [
                                 _buildActionIcon(Icons.call, () {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                          content: Text(
-                                              "Calling ${appointment.patientName}...")));
+                                  _callHardcodedNumber();
                                 }),
                                 SizedBox(width: 12),
                                 _buildActionIcon(Icons.message_outlined, () {

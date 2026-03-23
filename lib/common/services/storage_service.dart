@@ -29,6 +29,8 @@ class StorageService {
   static const String _patientNotesPrefix = 'patient_notes_';
   static const String _patientFilesPrefix = 'patient_files_';
   static const String _patientDetailsPrefix = 'patient_details_';
+  static const String _patientSelfProfilePrefix = 'patient_self_profile_';
+  static const String _patientBookingRequestsPrefix = 'patient_bookings_';
 
   /// Register new user in local storage.
   /// Users are stored as a String list: "username|password|role|speciality".
@@ -145,6 +147,50 @@ class StorageService {
       await _prefs?.remove(_currentSpecialityKey);
     } catch (e) {
       print("❌ Error clearing session: $e");
+    }
+  }
+
+  /// Permanently delete the current logged-in account and related local data.
+  Future<bool> deleteCurrentAccount() async {
+    try {
+      final prefs = _prefs;
+      if (prefs == null) return false;
+
+      final username = prefs.getString(_currentUsernameKey);
+      if (username == null || username.isEmpty) return false;
+
+      final role = prefs.getString(_currentRoleKey) ?? '';
+      final users = prefs.getStringList(_usersKey) ?? <String>[];
+      final filtered = users.where((u) {
+        final parts = u.split('|');
+        return parts.isEmpty || parts[0] != username;
+      }).toList();
+      await prefs.setStringList(_usersKey, filtered);
+
+      // Remove role-specific/user-specific stored data.
+      await prefs.remove('doctor_profile_image_$username');
+      await prefs.remove('patient_profile_image_$username');
+      await prefs.remove('$_patientSelfProfilePrefix$username');
+      await prefs.remove('$_patientBookingRequestsPrefix$username');
+
+      // If doctor, clear all appointment statuses and attached per-patient data.
+      if (role.toLowerCase() == 'doctor') {
+        final keys = prefs.getKeys();
+        for (final key in keys) {
+          if (key.startsWith(_appointmentStatusPrefix) ||
+              key.startsWith(_patientNotesPrefix) ||
+              key.startsWith(_patientFilesPrefix) ||
+              key.startsWith(_patientDetailsPrefix)) {
+            await prefs.remove(key);
+          }
+        }
+      }
+
+      await clearSession();
+      return true;
+    } catch (e) {
+      print("❌ Error deleting current account: $e");
+      return false;
     }
   }
 
@@ -500,6 +546,78 @@ class StorageService {
     } catch (e) {
       print("❌ Error getting patient details: $e");
       return null;
+    }
+  }
+
+  // ==================== PATIENT APP (SELF-SERVICE) ====================
+
+  /// Patient's own profile (mirrors fields shown to doctors: demographics, contact, medical).
+  /// Keyed by login username.
+  Future<bool> savePatientSelfProfile(
+      String username, Map<String, String> profile) async {
+    try {
+      final prefs = _prefs;
+      if (prefs == null || username.isEmpty) return false;
+      final key = '$_patientSelfProfilePrefix$username';
+      return await prefs.setString(key, jsonEncode(profile));
+    } catch (e) {
+      print("❌ Error saving patient self profile: $e");
+      return false;
+    }
+  }
+
+  Map<String, String>? getPatientSelfProfile(String username) {
+    try {
+      final prefs = _prefs;
+      if (prefs == null || username.isEmpty) return null;
+      final key = '$_patientSelfProfilePrefix$username';
+      final raw = prefs.getString(key);
+      if (raw == null || raw.isEmpty) return null;
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map) return null;
+      return decoded.map<String, String>(
+        (k, v) => MapEntry(k.toString(), v.toString()),
+      );
+    } catch (e) {
+      print("❌ Error reading patient self profile: $e");
+      return null;
+    }
+  }
+
+  /// Append a booking request (local demo until backend exists).
+  Future<bool> addPatientBookingRequest(
+      String username, Map<String, String> request) async {
+    try {
+      final prefs = _prefs;
+      if (prefs == null || username.isEmpty) return false;
+      final list = getPatientBookingRequests(username);
+      list.add(request);
+      final key = '$_patientBookingRequestsPrefix$username';
+      final encoded =
+          jsonEncode(list.map((m) => m).toList());
+      return await prefs.setString(key, encoded);
+    } catch (e) {
+      print("❌ Error saving booking request: $e");
+      return false;
+    }
+  }
+
+  List<Map<String, String>> getPatientBookingRequests(String username) {
+    try {
+      final prefs = _prefs;
+      if (prefs == null || username.isEmpty) return [];
+      final key = '$_patientBookingRequestsPrefix$username';
+      final raw = prefs.getString(key);
+      if (raw == null || raw.isEmpty) return [];
+      final decoded = jsonDecode(raw);
+      if (decoded is! List) return [];
+      return decoded.map<Map<String, String>>((e) {
+        if (e is! Map) return <String, String>{};
+        return e.map((k, v) => MapEntry(k.toString(), v.toString()));
+      }).toList();
+    } catch (e) {
+      print("❌ Error reading booking requests: $e");
+      return [];
     }
   }
 

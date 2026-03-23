@@ -1,4 +1,24 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Android 11+ package visibility: allow resolving dialer / Phone for tel: -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.DIAL" />
+            <data android:scheme="tel" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="tel" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.CALL" />
+            <data android:scheme="tel" />
+        </intent>
+    </queries>
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
+    <!-- Required for FlutterPhoneDirectCaller.callNumber on Android -->
+    <uses-permission android:name="android.permission.CALL_PHONE" />
     <application
         android:label="Mediverse"
         android:name="${applicationName}"

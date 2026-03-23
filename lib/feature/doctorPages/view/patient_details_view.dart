@@ -4,9 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:open_filex/open_filex.dart';
 import '../../../common/services/storage_service.dart';
+import '../../../common/utils/phone_launcher.dart' show launchCallWithLoader;
 
 class PatientDetails extends StatefulWidget {
-  final PatientModel patient;
+  final NewPatientResponse patient;
   final AppointmentModel? appointment;
 
   const PatientDetails({
@@ -37,10 +38,15 @@ class _PatientDetailsState extends State<PatientDetails> {
   late TextEditingController _appointmentTimeController;
   late TextEditingController _symptomsController;
   late TextEditingController _diagnosisController;
+  static const String _hardcodedPhoneNumber = "+91 7900464524";
 
   TextEditingController get notesController {
     _notesController ??= TextEditingController();
     return _notesController!;
+  }
+
+  Future<void> _callHardcodedNumber() async {
+    await launchCallWithLoader(context, _hardcodedPhoneNumber);
   }
 
   Widget _buildStatusCard() {
@@ -158,22 +164,22 @@ class _PatientDetailsState extends State<PatientDetails> {
     _selectedStatus = initialStatus;
 
     // Initialize editable controllers from the current patient/appointment data
-    _phoneController = TextEditingController(text: widget.patient.contact);
-    _emailController = TextEditingController(text: widget.patient.email);
-    _addressController = TextEditingController(text: widget.patient.address);
+    _phoneController = TextEditingController(text: widget.patient.contact?.phone ?? "");
+    _emailController = TextEditingController(text: widget.patient.contact?.email ?? "");
+    _addressController = TextEditingController(text: widget.patient.contact?.address ?? "");
     _medicalHistoryController =
-        TextEditingController(text: widget.patient.medicalHistory);
+        TextEditingController(text: widget.patient.medicalHistory?.historyNotes ?? "");
     _currentMedicationsController =
-        TextEditingController(text: widget.patient.currentMedications);
+        TextEditingController(text: widget.patient.medicalHistory?.currentMedications ?? "");
     _allergiesController =
-        TextEditingController(text: widget.patient.allergies);
+        TextEditingController(text: widget.patient.medicalHistory?.allergies ?? "");
     _lastVisitController =
-        TextEditingController(text: widget.patient.lastVisit);
+        TextEditingController(text: widget.patient.medicalHistory?.lastVisitDate ?? "");
     _appointmentTimeController =
-        TextEditingController(text: widget.appointment?.time ?? "N/A");
-    _symptomsController = TextEditingController(text: widget.patient.symptoms);
+        TextEditingController(text: widget.patient.appointment?.scheduledTime ?? "N/A");
+    _symptomsController = TextEditingController(text: widget.patient.appointment?.symptoms ?? "");
     _diagnosisController =
-        TextEditingController(text: widget.patient.diagnosis);
+        TextEditingController(text: widget.patient.appointment?.diagnosis ?? "");
 
     // Now load any persisted values that override the defaults.
     _loadPersistedStatus();
@@ -185,7 +191,7 @@ class _PatientDetailsState extends State<PatientDetails> {
   Future<void> _loadSavedNotes() async {
     try {
       final storage = await StorageService.getInstance();
-      final notes = storage.getPatientNotes(widget.patient.id);
+      final notes = storage.getPatientNotes(widget.patient.patientId ?? "");
       setState(() {
         _savedNotes = notes;
       });
@@ -199,7 +205,7 @@ class _PatientDetailsState extends State<PatientDetails> {
     if (text.isEmpty) return;
     try {
       final storage = await StorageService.getInstance();
-      await storage.addPatientNote(widget.patient.id, text);
+      await storage.addPatientNote(widget.patient.patientId ?? "", text);
       notesController.clear();
       setState(() {
         notes = "";
@@ -213,7 +219,7 @@ class _PatientDetailsState extends State<PatientDetails> {
   Future<void> _loadEditableDetails() async {
     try {
       final storage = await StorageService.getInstance();
-      final details = storage.getPatientDetails(widget.patient.id);
+      final details = storage.getPatientDetails(widget.patient.patientId ?? "");
       if (details == null) return;
       setState(() {
         _phoneController.text = details['phone'] ?? _phoneController.text;
@@ -242,7 +248,7 @@ class _PatientDetailsState extends State<PatientDetails> {
   Future<void> _saveEditableDetails() async {
     try {
       final storage = await StorageService.getInstance();
-      final ok = await storage.savePatientDetails(widget.patient.id, {
+      final ok = await storage.savePatientDetails(widget.patient.patientId ?? "", {
         'phone': _phoneController.text,
         'email': _emailController.text,
         'address': _addressController.text,
@@ -275,7 +281,7 @@ class _PatientDetailsState extends State<PatientDetails> {
   Future<void> _loadAttachments() async {
     try {
       final storage = await StorageService.getInstance();
-      final files = storage.getPatientFiles(widget.patient.id);
+      final files = storage.getPatientFiles(widget.patient.patientId ?? "");
       setState(() {
         _attachments = files;
       });
@@ -296,7 +302,7 @@ class _PatientDetailsState extends State<PatientDetails> {
       final name = file.name;
 
       final storage = await StorageService.getInstance();
-      final ok = await storage.addPatientFile(widget.patient.id, name, path);
+      final ok = await storage.addPatientFile(widget.patient.patientId ?? "", name, path);
       if (!ok) return;
       await _loadAttachments();
       if (!mounted) return;
@@ -663,7 +669,7 @@ class _PatientDetailsState extends State<PatientDetails> {
           ),
           SizedBox(height: 16),
           Text(
-            widget.patient.name,
+            widget.patient.profile?.name ?? "Unknown",
             style: TextStyle(
               fontSize: 26,
               fontWeight: FontWeight.bold,
@@ -679,7 +685,7 @@ class _PatientDetailsState extends State<PatientDetails> {
               borderRadius: BorderRadius.circular(20),
             ),
             child: Text(
-              widget.patient.diagnosis,
+              widget.patient.appointment?.diagnosis ?? "No diagnosis",
               style: TextStyle(
                 color: Colors.white,
                 fontWeight: FontWeight.w600,
@@ -696,12 +702,12 @@ class _PatientDetailsState extends State<PatientDetails> {
   Widget _buildQuickStatsGrid() {
     return Row(
       children: [
-        _buildStatCard("Age", widget.patient.age, Icons.cake),
+        _buildStatCard("Age", widget.patient.profile?.age ?? "N/A", Icons.cake),
         SizedBox(width: 12),
-        _buildStatCard("Blood", widget.patient.bloodGroup, Icons.bloodtype),
+        _buildStatCard("Blood", widget.patient.profile?.bloodGroup ?? "N/A", Icons.bloodtype),
         SizedBox(width: 12),
         _buildStatCard(
-            "Gender", widget.patient.gender, Icons.male), // Simplified icon
+            "Gender", widget.patient.profile?.gender ?? "N/A", Icons.male), // Simplified icon
       ],
     );
   }
@@ -989,8 +995,7 @@ class _PatientDetailsState extends State<PatientDetails> {
                 Icons.call,
                 Colors.white,
                 const Color(0xFF6A9C89), // Sage Green
-                () => ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                    content: Text("Calling ${widget.patient.contact}..."))),
+                _callHardcodedNumber,
               ),
             ),
             SizedBox(width: 16),
