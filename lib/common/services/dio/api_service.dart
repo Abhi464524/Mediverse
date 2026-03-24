@@ -1,4 +1,7 @@
+import 'dart:convert';
+
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:mediverse/common/services/dio/curl_logger_dio_interceptor.dart';
 
 class DioClient {
@@ -41,8 +44,8 @@ class DioClient {
         cancelToken: cancelToken,
       );
       return response;
-    } on DioException catch (e) {
-      throw _handleError(e);
+    } on DioException catch (e, stackTrace) {
+      _rethrowHandled(e, stackTrace);
     }
   }
 
@@ -63,8 +66,8 @@ class DioClient {
         cancelToken: cancelToken,
       );
       return response;
-    } on DioException catch (e) {
-      throw _handleError(e);
+    } on DioException catch (e, stackTrace) {
+      _rethrowHandled(e, stackTrace);
     }
   }
 
@@ -85,8 +88,8 @@ class DioClient {
         cancelToken: cancelToken,
       );
       return response;
-    } on DioException catch (e) {
-      throw _handleError(e);
+    } on DioException catch (e, stackTrace) {
+      _rethrowHandled(e, stackTrace);
     }
   }
 
@@ -107,9 +110,36 @@ class DioClient {
         cancelToken: cancelToken,
       );
       return response;
-    } on DioException catch (e) {
-      throw _handleError(e);
+    } on DioException catch (e, stackTrace) {
+      _rethrowHandled(e, stackTrace);
     }
+  }
+
+  Never _rethrowHandled(DioException e, StackTrace stackTrace) {
+    final userMessage = _handleError(e);
+    _logDioException(e, userMessage, stackTrace);
+    throw userMessage;
+  }
+
+  void _logDioException(
+    DioException e,
+    String userMessage,
+    StackTrace stackTrace,
+  ) {
+    debugPrint('══ DioException ══');
+    debugPrint('User message: $userMessage');
+    debugPrint('URI: ${e.requestOptions.uri}');
+    debugPrint('Method: ${e.requestOptions.method}');
+    debugPrint('Dio type: ${e.type}');
+    debugPrint('Dio message: ${e.message}');
+    debugPrint('Underlying: ${e.error}');
+    final response = e.response;
+    if (response != null) {
+      debugPrint('Status: ${response.statusCode}');
+      debugPrint('Response data: ${response.data}');
+    }
+    debugPrint('Stack trace:\n$stackTrace');
+    debugPrint('═══════════════════');
   }
 
   // Error Handling
@@ -120,12 +150,56 @@ class DioClient {
     } else if (e.type == DioExceptionType.receiveTimeout) {
       message = "Receive timeout";
     } else if (e.type == DioExceptionType.badResponse) {
-      message = "Received invalid status code: ${e.response?.statusCode}";
+      final code = e.response?.statusCode;
+      final detail = _httpErrorBodySummary(e.response?.data);
+      message = detail.isNotEmpty
+          ? 'HTTP $code: $detail'
+          : 'Received invalid status code: $code';
     } else if (e.type == DioExceptionType.cancel) {
       message = "Request to API server was cancelled";
     } else if (e.type == DioExceptionType.connectionError) {
-      message = "No internet connection";
+      final host = e.requestOptions.uri.host;
+      final isLocalHost = host == 'localhost' || host == '127.0.0.1';
+      final errStr = e.error?.toString() ?? '';
+      if (isLocalHost && errStr.contains('Connection refused')) {
+        message =
+            "API base URL is localhost: on a real phone that means the phone, not your computer. "
+            "Stop the app, then run: flutter run --dart-define=API_BASE_URL=http://YOUR_PC_LAN_IP:3000/api "
+            "(Mac: ipconfig getifaddr en0; phone and PC on same Wi-Fi; server must listen on 0.0.0.0). "
+            "Android emulator only: use http://10.0.2.2:3000/api. "
+            "Or use VS Code: \"Mediverse · physical device (API on Mac)\" after setting the IP in .vscode/launch.json.";
+      } else if (errStr.isNotEmpty) {
+        message = "Network error: $errStr";
+      } else {
+        message = "No internet connection";
+      }
     }
     return message;
+  }
+
+  /// Short text from error JSON/HTML so snackbars and logs show why the server failed.
+  String _httpErrorBodySummary(dynamic data, {int maxLen = 400}) {
+    if (data == null) return '';
+    if (data is String) {
+      final t = data.trim();
+      if (t.isEmpty) return '';
+      return t.length > maxLen ? '${t.substring(0, maxLen)}…' : t;
+    }
+    if (data is Map) {
+      final msg = data['message'] ?? data['error'] ?? data['msg'];
+      if (msg != null) {
+        final s = msg.toString();
+        return s.length > maxLen ? '${s.substring(0, maxLen)}…' : s;
+      }
+      try {
+        final s = jsonEncode(data);
+        return s.length > maxLen ? '${s.substring(0, maxLen)}…' : s;
+      } catch (_) {
+        final s = data.toString();
+        return s.length > maxLen ? '${s.substring(0, maxLen)}…' : s;
+      }
+    }
+    final s = data.toString();
+    return s.length > maxLen ? '${s.substring(0, maxLen)}…' : s;
   }
 }

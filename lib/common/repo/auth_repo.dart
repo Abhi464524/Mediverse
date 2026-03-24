@@ -1,5 +1,6 @@
 import 'package:mediverse/common/model/auth_request_model.dart';
 import 'package:mediverse/common/model/auth_response_model.dart';
+import 'package:mediverse/common/model/signup_request_model.dart';
 import 'package:mediverse/common/services/dio/api_service.dart';
 import 'package:mediverse/endPoints.dart';
 
@@ -18,7 +19,7 @@ class AuthRepo {
     return AuthResponseModel.fromJson(map);
   }
 
-  Future<AuthResponseModel> signUp(AuthRequestModel request) async {
+  Future<AuthResponseModel> signUp(SignUpRequestModel request) async {
     final response = await _dioClient.post(
       EndPoints.userSignUpURL,
       data: request.toJson(),

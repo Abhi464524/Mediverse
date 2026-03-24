@@ -5,6 +5,8 @@ class EndPoints {
 
   // Auth
   static const String userLoginURL = "$baseURL/users/login";
+  /// POST signup — `http://localhost:3000/api/users/signup` when [baseURL] is default.
+  /// JSON: `userName`, `password`, `role` (`doctor` | `patient`), `speciality` (doctor; empty for patient).
   static const String userSignUpURL = "$baseURL/users/signup";
 
   // Doctor APIs
