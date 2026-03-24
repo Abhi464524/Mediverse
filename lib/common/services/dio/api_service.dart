@@ -1,5 +1,5 @@
 import 'package:dio/dio.dart';
-import 'package:doctor_app/common/services/dio/curl_logger_dio_interceptor.dart';
+import 'package:mediverse/common/services/dio/curl_logger_dio_interceptor.dart';
 
 class DioClient {
   late final Dio _dio;
@@ -15,15 +15,7 @@ class DioClient {
     var dio = Dio();
     dio.options.connectTimeout = const Duration(milliseconds: 50000);
     dio.options.receiveTimeout = const Duration(milliseconds: 50000);
-
-    // dio.interceptors.add(LoggerInterceptor()); // TODO: Add dependency if needed
     dio.interceptors.add(CurlInterceptor());
-    
-    // // if (isDebugMode) {
-    // dio.interceptors.add(ChuckerDioInterceptor()); // TODO: Add dependency if needed
-    // }
-    
-    // Adding standard LogInterceptor as a fall-back for now
     dio.interceptors.add(LogInterceptor(
       requestBody: true,
       responseBody: true,

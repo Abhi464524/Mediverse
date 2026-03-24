@@ -1,7 +1,7 @@
 import 'package:dio/dio.dart';
-import 'package:doctor_app/common/services/dio/api_service.dart';
-import 'package:doctor_app/endPoints.dart';
-import 'package:doctor_app/feature/doctorPages/model/patient_model.dart';
+import 'package:mediverse/common/services/dio/api_service.dart';
+import 'package:mediverse/endPoints.dart';
+import 'package:mediverse/feature/doctorPages/model/patient_model.dart';
 
 class DoctorRepo {
   final DioClient _dioClient = DioClient();

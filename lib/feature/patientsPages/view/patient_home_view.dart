@@ -1,10 +1,10 @@
-import 'package:doctor_app/feature/patientsPages/model/patient_repository.dart';
-import 'package:doctor_app/feature/patientsPages/model/patient_models.dart';
-import 'package:doctor_app/feature/patientsPages/view/patient_notifications_view.dart';
-import 'package:doctor_app/feature/patientsPages/view/patient_book_appointment_view.dart';
-import 'package:doctor_app/feature/patientsPages/view/patient_doctors_view.dart';
-import 'package:doctor_app/feature/patientsPages/view/patient_footer_view.dart';
-import 'package:doctor_app/feature/patientsPages/view/patient_profile_view.dart';
+import 'package:mediverse/feature/patientsPages/model/patient_repository.dart';
+import 'package:mediverse/feature/patientsPages/model/patient_models.dart';
+import 'package:mediverse/feature/patientsPages/view/patient_notifications_view.dart';
+import 'package:mediverse/feature/patientsPages/view/patient_book_appointment_view.dart';
+import 'package:mediverse/feature/patientsPages/view/patient_doctors_view.dart';
+import 'package:mediverse/feature/patientsPages/view/patient_footer_view.dart';
+import 'package:mediverse/feature/patientsPages/view/patient_profile_view.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 

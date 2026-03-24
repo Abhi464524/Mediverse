@@ -1,4 +1,4 @@
-package com.example.doctor_app
+package com.example.mediverse
 
 import android.content.ActivityNotFoundException
 import android.content.Intent
@@ -10,7 +10,7 @@ import io.flutter.plugin.common.MethodChannel
 class MainActivity : FlutterActivity() {
 
     companion object {
-        private const val CHANNEL = "com.example.doctor_app/phone"
+        private const val CHANNEL = "com.example.mediverse/phone"
     }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {

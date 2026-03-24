@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
-import 'package:doctor_app/common/services/storage_service.dart';
+import 'package:mediverse/common/services/storage_service.dart';
 
 class EditDoctorProfileView extends StatefulWidget {
   final String currentName;

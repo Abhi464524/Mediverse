@@ -1,6 +1,6 @@
 import 'package:get/get.dart';
-import 'package:doctor_app/feature/doctorPages/model/patient_model.dart';
-import 'package:doctor_app/feature/doctorPages/repo/doctor_repo.dart';
+import 'package:mediverse/feature/doctorPages/model/patient_model.dart';
+import 'package:mediverse/feature/doctorPages/repo/doctor_repo.dart';
 
 class PatientController extends GetxController {
   final DoctorRepo _doctorRepo = DoctorRepo();

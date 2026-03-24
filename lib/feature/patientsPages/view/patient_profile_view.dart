@@ -1,8 +1,8 @@
-import 'package:doctor_app/common/view/user_selection_view.dart';
-import 'package:doctor_app/common/services/storage_service.dart';
-import 'package:doctor_app/common/utils/language_utils.dart';
-import 'package:doctor_app/feature/patientsPages/view/patient_health_profile_view.dart';
-import 'package:doctor_app/feature/patientsPages/view/patient_notifications_view.dart';
+import 'package:mediverse/common/view/user_selection_view.dart';
+import 'package:mediverse/common/services/storage_service.dart';
+import 'package:mediverse/common/utils/language_utils.dart';
+import 'package:mediverse/feature/patientsPages/view/patient_health_profile_view.dart';
+import 'package:mediverse/feature/patientsPages/view/patient_notifications_view.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';

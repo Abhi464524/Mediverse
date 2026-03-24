@@ -1,5 +1,5 @@
-import 'package:doctor_app/feature/patientsPages/view/patient_my_appointments_view.dart';
-import 'package:doctor_app/feature/patientsPages/view/patient_doctors_view.dart';
+import 'package:mediverse/feature/patientsPages/view/patient_my_appointments_view.dart';
+import 'package:mediverse/feature/patientsPages/view/patient_doctors_view.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 

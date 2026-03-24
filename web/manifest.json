@@ -1,6 +1,6 @@
 {
-    "name": "doctor_app",
-    "short_name": "doctor_app",
+    "name": "Mediverse",
+    "short_name": "Mediverse",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

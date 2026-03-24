@@ -1,7 +1,7 @@
-import 'package:doctor_app/feature/doctorPages/view/doctor_footer_view.dart';
-import 'package:doctor_app/feature/doctorPages/view/patient_details_view.dart';
-import 'package:doctor_app/feature/doctorPages/model/appointment_model.dart';
-import 'package:doctor_app/feature/doctorPages/model/patient_model.dart';
+import 'package:mediverse/feature/doctorPages/view/doctor_footer_view.dart';
+import 'package:mediverse/feature/doctorPages/view/patient_details_view.dart';
+import 'package:mediverse/feature/doctorPages/model/appointment_model.dart';
+import 'package:mediverse/feature/doctorPages/model/patient_model.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:get/get.dart';

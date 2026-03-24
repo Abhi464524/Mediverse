@@ -1,5 +1,5 @@
-import 'package:doctor_app/common/view/user_selection_view.dart';
-import 'package:doctor_app/common/services/storage_service.dart';
+import 'package:mediverse/common/view/user_selection_view.dart';
+import 'package:mediverse/common/services/storage_service.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'working_hours_view.dart';

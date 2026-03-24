@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
+import '../controller/auth_controller.dart';
 import '../../feature/doctorPages/view/doctor_homepage_view.dart';
 import '../../feature/patientsPages/view/patient_home_view.dart';
-import '../services/storage_service.dart';
 
 class LogInPage extends StatefulWidget {
   final String role;
@@ -14,6 +14,7 @@ class LogInPage extends StatefulWidget {
 }
 
 class _LogInPageState extends State<LogInPage> {
+  final AuthController _authController = Get.put(AuthController());
   TextEditingController nameController = TextEditingController();
   TextEditingController passwordController = TextEditingController();
   TextEditingController specializationController = TextEditingController();
@@ -33,8 +34,11 @@ class _LogInPageState extends State<LogInPage> {
     }
 
     try {
-      StorageService storage = await StorageService.getInstance();
-      Map<String, String>? user = await storage.signIn(inputName, inputPass);
+      final user = await _authController.login(
+        username: inputName,
+        password: inputPass,
+        role: widget.role,
+      );
 
       if (!mounted) return;
 
@@ -45,7 +49,7 @@ class _LogInPageState extends State<LogInPage> {
         return;
       }
 
-      String role = user['role'] ?? '';
+      String role = user.role;
       if (role != widget.role.toLowerCase()) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text("Invalid credentials or role")),
@@ -53,8 +57,8 @@ class _LogInPageState extends State<LogInPage> {
         return;
       }
 
-      String name = user['username'] ?? inputName;
-      String speciality = user['speciality'] ?? '';
+      String name = user.username.isEmpty ? inputName : user.username;
+      String speciality = user.speciality;
 
       if (role == "doctor") {
         Get.off(DoctorHomePage(name: name, speciality: speciality));
@@ -205,6 +209,7 @@ class _ModernSignUpSheetState extends State<_ModernSignUpSheet> {
   late final TextEditingController _specializationController;
   bool _obscurePassword = true;
   bool _submitting = false;
+  final AuthController _authController = Get.find<AuthController>();
 
   bool get _isDoctor => widget.role.toLowerCase() == 'doctor';
 
@@ -251,8 +256,7 @@ class _ModernSignUpSheetState extends State<_ModernSignUpSheet> {
 
     setState(() => _submitting = true);
     try {
-      final storage = await StorageService.getInstance();
-      final saved = await storage.saveUser(
+      final response = await _authController.signUp(
         username: userName,
         password: pass,
         role: widget.role.toLowerCase(),
@@ -261,12 +265,13 @@ class _ModernSignUpSheetState extends State<_ModernSignUpSheet> {
 
       if (!mounted) return;
 
-      if (!saved) {
-        throw Exception('Username may already be taken.');
+      if (response == null || !response.success) {
+        throw Exception(
+          response?.message.isNotEmpty == true
+              ? response!.message
+              : 'Signup failed.',
+        );
       }
-
-      // Persist session immediately after signup so app relaunch keeps user logged in.
-      await storage.signIn(userName, pass);
 
       Navigator.of(context).pop();
       ScaffoldMessenger.of(context).showSnackBar(

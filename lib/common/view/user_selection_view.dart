@@ -1,4 +1,4 @@
-import 'package:doctor_app/common/view/logIn_view.dart';
+import 'package:mediverse/common/view/logIn_view.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 

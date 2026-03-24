@@ -1,5 +1,5 @@
-import 'package:doctor_app/common/services/storage_service.dart';
-import 'package:doctor_app/feature/patientsPages/model/patient_models.dart';
+import 'package:mediverse/common/services/storage_service.dart';
+import 'package:mediverse/feature/patientsPages/model/patient_models.dart';
 
 abstract class PatientRepository {
   static PatientRepository instance = LocalPatientRepository();

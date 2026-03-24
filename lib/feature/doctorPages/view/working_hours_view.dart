@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:doctor_app/common/services/storage_service.dart';
+import 'package:mediverse/common/services/storage_service.dart';
 import 'dart:convert';
 
 class WorkingHoursView extends StatefulWidget {

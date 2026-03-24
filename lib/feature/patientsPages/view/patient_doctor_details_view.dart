@@ -1,6 +1,6 @@
-import 'package:doctor_app/feature/patientsPages/model/patient_models.dart';
-import 'package:doctor_app/feature/patientsPages/view/patient_book_appointment_view.dart';
-import 'package:doctor_app/common/utils/phone_launcher.dart' show launchCallWithLoader;
+import 'package:mediverse/feature/patientsPages/model/patient_models.dart';
+import 'package:mediverse/feature/patientsPages/view/patient_book_appointment_view.dart';
+import 'package:mediverse/common/utils/phone_launcher.dart' show launchCallWithLoader;
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 

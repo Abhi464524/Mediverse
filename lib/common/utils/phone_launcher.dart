@@ -9,7 +9,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 /// Channel must match [MainActivity] in Android.
 const MethodChannel _kAndroidPhoneChannel =
-    MethodChannel('com.example.doctor_app/phone');
+    MethodChannel('com.example.mediverse/phone');
 
 /// Normalizes [phoneNumber] for tel: / dial APIs (removes spaces).
 String normalizePhoneDigits(String phoneNumber) {

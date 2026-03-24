@@ -1,4 +1,4 @@
-import 'package:doctor_app/feature/doctorPages/model/doctor_notification_model.dart';
+import 'package:mediverse/feature/doctorPages/model/doctor_notification_model.dart';
 import 'package:flutter/material.dart';
 
 abstract class PatientNotificationRepository {

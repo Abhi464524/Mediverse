@@ -1,5 +1,5 @@
-import 'package:doctor_app/feature/doctorPages/model/medicine_model.dart';
-import 'package:doctor_app/feature/doctorPages/view/doctor_footer_view.dart';
+import 'package:mediverse/feature/doctorPages/model/medicine_model.dart';
+import 'package:mediverse/feature/doctorPages/view/doctor_footer_view.dart';
 import 'package:flutter/material.dart';
 
 class MedicineDetails extends StatefulWidget {
