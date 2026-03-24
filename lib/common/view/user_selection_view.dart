@@ -68,19 +68,14 @@ class _userSelectionPageState extends State<userSelectionPage> {
                   color: const Color(0xFF2C3E50), // Midnight Blue
                 ),
                 child: Center(
-                    child: GestureDetector(
-                  // onTap: () {
-                  //   Get.to(LogInPage(role: "doctor"));
-                  // },
-                  child: Text(
-                    "Doctor",
-                    style: TextStyle(
-                      fontSize: 18,
-                      color: Colors.white,
-                      decoration: TextDecoration.none,
-                    ),
-                  ),
-                )),
+                    child: Text(
+                      "Doctor",
+                      style: TextStyle(
+                        fontSize: 18,
+                        color: Colors.white,
+                        decoration: TextDecoration.none,
+                      ),
+                    )),
               ),
             ),
             SizedBox(
