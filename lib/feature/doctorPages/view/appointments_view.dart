@@ -30,6 +30,13 @@ class AppointmentsPageState extends State<AppointmentsPage> {
   final PatientController _patientController = Get.put(PatientController());
   final Map<String, String> _persistedStatuses = {};
   static const String _hardcodedPhoneNumber = "+91 7900464524";
+  static const List<String> _doctorSlots = <String>[
+    '10:00 AM',
+    '11:30 AM',
+    '02:00 PM',
+    '04:15 PM',
+    '06:00 PM',
+  ];
 
   Future<void> _callHardcodedNumber() async {
     await launchCallWithLoader(context, _hardcodedPhoneNumber);
@@ -151,14 +158,15 @@ class AppointmentsPageState extends State<AppointmentsPage> {
     TextEditingController ageController = TextEditingController();
     TextEditingController genderController = TextEditingController();
     TextEditingController contactController = TextEditingController();
-    TextEditingController timeController = TextEditingController();
     TextEditingController diagnosisController = TextEditingController();
+    String selectedSlot = '';
 
     showDialog(
         barrierColor:
             const Color(0xFFC4DAD2).withOpacity(0.5), // Soft Sage Accent
         context: context,
-        builder: (context) => AlertDialog(
+        builder: (context) => StatefulBuilder(
+          builder: (context, setDialogState) => AlertDialog(
               backgroundColor: Colors.white,
               insetPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 40),
               shape: RoundedRectangleBorder(
@@ -199,8 +207,50 @@ class AppointmentsPageState extends State<AppointmentsPage> {
                       _buildDialogTextField(
                           contactController, "Contact Number", Icons.phone),
                       SizedBox(height: 16),
-                      _buildDialogTextField(timeController,
-                          "Appointment Time", Icons.access_time),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          'Appointment Time Slot',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            color: Colors.grey.shade700,
+                            fontFamily: 'Poppins',
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: _doctorSlots.map((slot) {
+                          final isSelected = selectedSlot == slot;
+                          return ChoiceChip(
+                            label: Text(
+                              slot,
+                              style: TextStyle(
+                                color: isSelected ? Colors.white : Colors.black87,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            selected: isSelected,
+                            selectedColor: const Color(0xFF6A9C89),
+                            backgroundColor: const Color(0xFFF2F7F5),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                              side: BorderSide(
+                                color: isSelected
+                                    ? const Color(0xFF6A9C89)
+                                    : const Color(0xFFC4DAD2),
+                              ),
+                            ),
+                            onSelected: (_) {
+                              setDialogState(() {
+                                selectedSlot = slot;
+                              });
+                            },
+                          );
+                        }).toList(),
+                      ),
                       SizedBox(height: 16),
                       _buildDialogTextField(diagnosisController, "Diagnosis",
                           Icons.monitor_heart_outlined),
@@ -226,7 +276,7 @@ class AppointmentsPageState extends State<AppointmentsPage> {
                                     ? null
                                     : () async {
                                         if (nameController.text.isNotEmpty &&
-                                            timeController.text.isNotEmpty) {
+                                            selectedSlot.isNotEmpty) {
                                           final newPatient = NewPatientResponse(
                                             patientId: DateTime.now()
                                                 .millisecondsSinceEpoch
@@ -240,7 +290,7 @@ class AppointmentsPageState extends State<AppointmentsPage> {
                                               phone: contactController.text,
                                             ),
                                             appointment: Appointment(
-                                              scheduledTime: timeController.text,
+                                              scheduledTime: selectedSlot,
                                               diagnosis: diagnosisController.text,
                                             ),
                                           );
@@ -253,7 +303,7 @@ class AppointmentsPageState extends State<AppointmentsPage> {
                                               appointments.add(AppointmentModel(
                                                 id: newPatient.patientId ?? '',
                                                 patientName: newPatient.profile?.name ?? '',
-                                                time: timeController.text,
+                                                time: selectedSlot,
                                                 diagnosis: newPatient.appointment?.diagnosis ?? '',
                                               ));
                                             });
@@ -290,7 +340,8 @@ class AppointmentsPageState extends State<AppointmentsPage> {
                   ),
                 ),
               ),
-            ));
+            ),
+        ));
   }
 
   Widget _buildDialogTextField(

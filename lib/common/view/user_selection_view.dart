@@ -40,81 +40,96 @@ class _userSelectionPageState extends State<userSelectionPage> {
                 borderRadius: BorderRadius.circular(20),
                 color: Colors.white,
               ),
-              child: Image.asset(
-                "assets/selection_page/doctor_selection.png",
-                height: 150,
-                width: 150,
+              child: GestureDetector(
+                onTap: () {
+                  Get.to(LogInPage(role: "doctor"));
+                },
+                child: Image.asset(
+                  "assets/selection_page/doctor_selection.png",
+                  height: 150,
+                  width: 150,
+                ),
               ),
             ),
             SizedBox(
               height: 20,
             ),
-            Container(
-              width: 150,
-              padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                border: Border.all(
-                    color: const Color(0xFF2C3E50), width: 2), // Midnight Blue
-                borderRadius: BorderRadius.circular(20),
-                color: const Color(0xFF2C3E50), // Midnight Blue
-              ),
-              child: Center(
-                  child: GestureDetector(
-                onTap: () {
-                  Get.to(LogInPage(role: "doctor"));
-                },
-                child: Text(
-                  "Doctor",
-                  style: TextStyle(
-                    fontSize: 18,
-                    color: Colors.white,
-                    decoration: TextDecoration.none,
-                  ),
+            GestureDetector(
+              onTap: () {
+                Get.to(LogInPage(role: "doctor"));
+              },
+              child: Container(
+                width: 150,
+                padding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                decoration: BoxDecoration(
+                  border: Border.all(
+                      color: const Color(0xFF2C3E50), width: 2), // Midnight Blue
+                  borderRadius: BorderRadius.circular(20),
+                  color: const Color(0xFF2C3E50), // Midnight Blue
                 ),
-              )),
+                child: Center(
+                    child: GestureDetector(
+                  // onTap: () {
+                  //   Get.to(LogInPage(role: "doctor"));
+                  // },
+                  child: Text(
+                    "Doctor",
+                    style: TextStyle(
+                      fontSize: 18,
+                      color: Colors.white,
+                      decoration: TextDecoration.none,
+                    ),
+                  ),
+                )),
+              ),
             ),
             SizedBox(
               height: 50,
             ),
-            Container(
-              decoration: BoxDecoration(
-                border: Border.all(
-                    color: const Color(0xFFB0BEC5), width: 4), // Blue Grey
-                borderRadius: BorderRadius.circular(20),
-                color: Colors.white,
-              ),
-              child: Image.asset(
-                "assets/selection_page/patient_selection.png",
-                height: 150,
-                width: 150,
+            GestureDetector(
+              onTap: () {
+                Get.to(LogInPage(role: "patient"));
+              },
+              child: Container(
+                decoration: BoxDecoration(
+                  border: Border.all(
+                      color: const Color(0xFFB0BEC5), width: 4), // Blue Grey
+                  borderRadius: BorderRadius.circular(20),
+                  color: Colors.white,
+                ),
+                child: Image.asset(
+                  "assets/selection_page/patient_selection.png",
+                  height: 150,
+                  width: 150,
+                ),
               ),
             ),
             SizedBox(
               height: 20,
             ),
-            Container(
-              width: 150,
-              padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                border: Border.all(
-                    color: const Color(0xFF2C3E50), width: 2), // Midnight Blue
-                borderRadius: BorderRadius.circular(20),
-                color: const Color(0xFF2C3E50), // Midnight Blue
-              ),
-              child: Center(
-                  child: GestureDetector(
-                onTap: () {
-                  Get.to(LogInPage(role: "patient"));
-                },
-                child: Text(
-                  "Patient",
-                  style: TextStyle(
-                    fontSize: 18,
-                    color: Colors.white,
-                    decoration: TextDecoration.none,
-                  ),
+            GestureDetector(
+              onTap: () {
+                Get.to(LogInPage(role: "patient"));
+              },
+              child: Container(
+                width: 150,
+                padding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                decoration: BoxDecoration(
+                  border: Border.all(
+                      color: const Color(0xFF2C3E50), width: 2),
+                  borderRadius: BorderRadius.circular(20),
+                  color: const Color(0xFF2C3E50),
                 ),
-              )),
+                child: Center(
+                    child: Text(
+                      "Patient",
+                      style: TextStyle(
+                        fontSize: 18,
+                        color: Colors.white,
+                        decoration: TextDecoration.none,
+                      ),
+                    )),
+              ),
             ),
           ],
         ),

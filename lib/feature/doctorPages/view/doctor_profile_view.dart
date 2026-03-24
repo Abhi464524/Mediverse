@@ -432,32 +432,64 @@ class _DoctorProfilePageState extends State<DoctorProfilePage> {
   }
 
   Future<void> _confirmDeleteAccount() async {
+    final confirmController = TextEditingController();
     final confirm = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete account'),
-        content: const Text(
-          'This will permanently delete your account and local data on this device.',
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Delete account'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'This will permanently delete your account and local data on this device.',
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'Type DELETE to confirm',
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: confirmController,
+                onChanged: (_) => setDialogState(() {}),
+                decoration: const InputDecoration(
+                  hintText: 'DELETE',
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(backgroundColor: Colors.red.shade400),
+              onPressed: confirmController.text.trim().toUpperCase() == 'DELETE'
+                  ? () => Navigator.pop(context, true)
+                  : null,
+              child: const Text('Delete'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: Colors.red.shade400),
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Delete'),
-          ),
-        ],
       ),
     );
+    confirmController.dispose();
     if (confirm != true) return;
     final storage = await StorageService.getInstance();
     final deleted = await storage.deleteCurrentAccount();
     if (!mounted) return;
     if (deleted) {
       Get.offAll(() => const userSelectionPage());
+      Get.snackbar(
+        'Account deleted',
+        'Your account has been deleted successfully.',
+        snackPosition: SnackPosition.BOTTOM,
+      );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Unable to delete account.')),
