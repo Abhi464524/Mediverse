@@ -124,6 +124,13 @@ class _LogInPageState extends State<LogInPage> {
           ? (_loginWithPhone ? inputPhone : inputName)
           : user.username;
       String speciality = user.speciality;
+      final storage = await StorageService.getInstance();
+      await storage.setCurrentSession(
+        username: name,
+        role: role,
+        phoneNumber: user.phoneNumber,
+        speciality: speciality,
+      );
 
       if (role == "doctor") {
         Get.off(DoctorHomePage(name: name, speciality: speciality));
@@ -263,6 +270,9 @@ class _LogInPageState extends State<LogInPage> {
       await storage.setCurrentSession(
         username: response.username.isNotEmpty ? response.username : phoneDigits,
         role: response.role.isNotEmpty ? response.role : widget.role,
+        phoneNumber: response.phoneNumber.isNotEmpty
+            ? response.phoneNumber
+            : phoneDigits,
         speciality: response.speciality,
       );
 

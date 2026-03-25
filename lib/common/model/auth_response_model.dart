@@ -2,6 +2,7 @@ class AuthResponseModel {
   final bool success;
   final String message;
   final String username;
+  final String phoneNumber;
   final String role;
   final String speciality;
   final String token;
@@ -10,6 +11,7 @@ class AuthResponseModel {
     required this.success,
     required this.message,
     required this.username,
+    required this.phoneNumber,
     required this.role,
     required this.speciality,
     required this.token,
@@ -36,6 +38,7 @@ class AuthResponseModel {
       success: json["success"] == true || hasPositiveSignal,
       message: (json["message"] ?? "").toString(),
       username: parsedUsername,
+      phoneNumber: (json["phoneNumber"] ?? userMap["phoneNumber"] ?? "").toString(),
       role: (json["role"] ?? userMap["role"] ?? "").toString(),
       speciality:
           (json["speciality"] ?? userMap["speciality"] ?? "").toString(),

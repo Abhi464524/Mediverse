@@ -23,6 +23,7 @@ class StorageService {
 
   static const String _usersKey = 'users';
   static const String _currentUsernameKey = 'current_username';
+  static const String _currentPhoneKey = 'current_phone';
   static const String _currentRoleKey = 'current_role';
   static const String _currentSpecialityKey = 'current_speciality';
   static const String _appointmentStatusPrefix = 'appointment_status_';
@@ -81,6 +82,7 @@ class StorageService {
         if (storedUsername == username && storedPassword == password) {
           // Persist current session.
           await prefs.setString(_currentUsernameKey, storedUsername);
+          await prefs.setString(_currentPhoneKey, '');
           await prefs.setString(_currentRoleKey, storedRole);
           await prefs.setString(_currentSpecialityKey, storedSpeciality);
 
@@ -107,10 +109,12 @@ class StorageService {
       final username = prefs.getString(_currentUsernameKey);
       if (username == null || username.isEmpty) return null;
 
+      final phoneNumber = prefs.getString(_currentPhoneKey) ?? '';
       final role = prefs.getString(_currentRoleKey) ?? '';
       final speciality = prefs.getString(_currentSpecialityKey) ?? '';
       return {
         'username': username,
+        'phoneNumber': phoneNumber,
         'role': role,
         'speciality': speciality,
       };
@@ -124,11 +128,13 @@ class StorageService {
   Future<void> setCurrentSession({
     required String username,
     required String role,
+    String phoneNumber = '',
     String speciality = '',
   }) async {
     final prefs = _prefs;
     if (prefs == null) return;
     await prefs.setString(_currentUsernameKey, username);
+    await prefs.setString(_currentPhoneKey, phoneNumber);
     await prefs.setString(_currentRoleKey, role.toLowerCase());
     await prefs.setString(_currentSpecialityKey, speciality);
   }
@@ -156,6 +162,7 @@ class StorageService {
   Future<void> clearSession() async {
     try {
       await _prefs?.remove(_currentUsernameKey);
+      await _prefs?.remove(_currentPhoneKey);
       await _prefs?.remove(_currentRoleKey);
       await _prefs?.remove(_currentSpecialityKey);
     } catch (e) {
