@@ -120,6 +120,19 @@ class StorageService {
     }
   }
 
+  /// Set the current logged-in session directly (used for Firebase phone login).
+  Future<void> setCurrentSession({
+    required String username,
+    required String role,
+    String speciality = '',
+  }) async {
+    final prefs = _prefs;
+    if (prefs == null) return;
+    await prefs.setString(_currentUsernameKey, username);
+    await prefs.setString(_currentRoleKey, role.toLowerCase());
+    await prefs.setString(_currentSpecialityKey, speciality);
+  }
+
   /// Convenience helper: returns the current doctor's display name (username).
   /// Falls back to null if no user is logged in or profile cannot be loaded.
   Future<String?> getDoctorName() async {

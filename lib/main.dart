@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:get/get.dart';
 import 'common/services/storage_service.dart';
 import 'common/view/user_selection_view.dart';
@@ -8,6 +9,7 @@ import 'common/translations.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp();
   final storage = await StorageService.getInstance();
 
   Widget initialRoute;

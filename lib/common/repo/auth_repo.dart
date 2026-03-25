@@ -19,6 +19,18 @@ class AuthRepo {
     return AuthResponseModel.fromJson(map);
   }
 
+  Future<AuthResponseModel> loginPhone(AuthRequestModel request) async {
+    final response = await _dioClient.post(
+      EndPoints.userPhoneLoginURL,
+      data: request.toJson(),
+    );
+
+    final map = response.data is Map<String, dynamic>
+        ? response.data as Map<String, dynamic>
+        : <String, dynamic>{};
+    return AuthResponseModel.fromJson(map);
+  }
+
   Future<AuthResponseModel> signUp(SignUpRequestModel request) async {
     final response = await _dioClient.post(
       EndPoints.userSignUpURL,

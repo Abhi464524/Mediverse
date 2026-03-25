@@ -11,21 +11,29 @@ class AuthController extends GetxController {
   final isLoading = false.obs;
 
   Future<AuthResponseModel?> login({
-    required String username,
-    required String password,
+    String username = "",
+    String phoneNumber = "",
+    String password = "",
+    String otp = "",
+    String firebaseIdToken = "",
     required String role,
     String speciality = "",
   }) async {
     try {
       isLoading.value = true;
-      final response = await _authRepo.login(
-        AuthRequestModel(
-          username: username,
-          password: password,
-          role: role.toLowerCase(),
-          speciality: speciality,
-        ),
+      final request = AuthRequestModel(
+        username: username,
+        phoneNumber: phoneNumber,
+        password: password,
+        otp: otp,
+        firebaseIdToken: firebaseIdToken,
+        role: role.toLowerCase(),
+        speciality: speciality,
       );
+
+      final response = firebaseIdToken.isNotEmpty
+          ? await _authRepo.loginPhone(request)
+          : await _authRepo.login(request);
       return response;
     } catch (e, stackTrace) {
       debugPrint('AuthController.login error: $e');
@@ -39,6 +47,7 @@ class AuthController extends GetxController {
 
   Future<AuthResponseModel?> signUp({
     required String username,
+    required String phoneNumber,
     required String password,
     required String role,
     String speciality = "",
@@ -49,11 +58,13 @@ class AuthController extends GetxController {
       final signUpRequest = normalizedRole == "doctor"
           ? SignUpRequestModel.forDoctor(
               username: username,
+              phoneNumber: phoneNumber,
               password: password,
               speciality: speciality,
             )
           : SignUpRequestModel.forPatient(
               username: username,
+              phoneNumber: phoneNumber,
               password: password,
             );
 

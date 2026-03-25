@@ -21,9 +21,16 @@ class AuthResponseModel {
         : <String, dynamic>{};
 
     final parsedUsername =
-        (json["username"] ?? userMap["username"] ?? "").toString();
+        (json["username"] ??
+                json["userName"] ??
+                userMap["username"] ??
+                userMap["userName"] ??
+                "")
+            .toString();
     final parsedToken = (json["token"] ?? "").toString();
-    final hasPositiveSignal = parsedUsername.isNotEmpty || parsedToken.isNotEmpty;
+    final hasPositiveSignal = parsedUsername.isNotEmpty ||
+        parsedToken.isNotEmpty ||
+        userMap.isNotEmpty;
 
     return AuthResponseModel(
       success: json["success"] == true || hasPositiveSignal,
