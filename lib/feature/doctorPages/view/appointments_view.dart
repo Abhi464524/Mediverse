@@ -29,6 +29,7 @@ class AppointmentsPage extends StatefulWidget {
 class AppointmentsPageState extends State<AppointmentsPage> {
   final PatientController _patientController = Get.put(PatientController());
   final Map<String, String> _persistedStatuses = {};
+  late final PageController _weekPageController;
   static const String _hardcodedPhoneNumber = "+91 7900464524";
   static const List<String> _doctorSlots = <String>[
     '10:00 AM',
@@ -37,6 +38,7 @@ class AppointmentsPageState extends State<AppointmentsPage> {
     '04:15 PM',
     '06:00 PM',
   ];
+  DateTime _selectedDate = DateTime.now();
 
   Future<void> _callHardcodedNumber() async {
     await launchCallWithLoader(context, _hardcodedPhoneNumber);
@@ -67,15 +69,64 @@ class AppointmentsPageState extends State<AppointmentsPage> {
     return DateTime.now().isAfter(appTime);
   }
 
+  DateTime _dateOnly(DateTime value) =>
+      DateTime(value.year, value.month, value.day);
+
+  DateTime _appointmentDateForIndex(int index) {
+    // Since sample data has no explicit date, spread records across days.
+    final base = _dateOnly(DateTime.now());
+    final dayOffset = index ~/ 5;
+    return base.add(Duration(days: dayOffset));
+  }
+
+  int _daysInMonth(DateTime date) {
+    final firstOfNextMonth = (date.month == 12)
+        ? DateTime(date.year + 1, 1, 1)
+        : DateTime(date.year, date.month + 1, 1);
+    return firstOfNextMonth.subtract(const Duration(days: 1)).day;
+  }
+
   @override
   void initState() {
     super.initState();
+    _selectedDate = _dateOnly(DateTime.now());
+    _weekPageController =
+        PageController(initialPage: _selectedWeekIndexForMonth(_selectedDate));
     _loadPersistedStatuses();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _jumpToSelectedWeek(animate: false);
+    });
     if (widget.showAddPatient) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _addPatients();
       });
     }
+  }
+
+  @override
+  void dispose() {
+    _weekPageController.dispose();
+    super.dispose();
+  }
+
+  int _selectedWeekIndexForMonth(DateTime selectedDate) {
+    final firstOfMonth = DateTime(selectedDate.year, selectedDate.month, 1);
+    final leadingEmptyCells = firstOfMonth.weekday % 7; // Sunday = 0
+    return ((leadingEmptyCells + selectedDate.day - 1) / 7).floor();
+  }
+
+  void _jumpToSelectedWeek({bool animate = true}) {
+    if (!_weekPageController.hasClients) return;
+    final targetPage = _selectedWeekIndexForMonth(_selectedDate);
+    if (animate) {
+      _weekPageController.animateToPage(
+        targetPage,
+        duration: const Duration(milliseconds: 240),
+        curve: Curves.easeOut,
+      );
+      return;
+    }
+    _weekPageController.jumpToPage(targetPage);
   }
 
   Future<void> _loadPersistedStatuses() async {
@@ -409,6 +460,8 @@ class AppointmentsPageState extends State<AppointmentsPage> {
         padding: EdgeInsets.only(top: 10),
         child: Column(
           children: [
+            _buildCalendarDateFilter(),
+            SizedBox(height: 10),
             _buildAppointmentsSection(),
             SizedBox(height: 80),
           ],
@@ -419,22 +472,32 @@ class AppointmentsPageState extends State<AppointmentsPage> {
   }
 
   Widget _buildAppointmentsSection() {
-    final sortedAppointments = List<AppointmentModel>.from(appointments)
-      ..sort((a, b) => _parseTime(a.time).compareTo(_parseTime(b.time)));
+    final indexedAppointments = appointments.asMap().entries.toList()
+      ..sort((a, b) => _parseTime(a.value.time).compareTo(_parseTime(b.value.time)));
 
-    final listToShow = widget.showOnlyToday && sortedAppointments.length > 5
-        ? sortedAppointments.sublist(0, 5)
-        : sortedAppointments;
+    final selected = _dateOnly(_selectedDate);
+    final filteredByDate = indexedAppointments
+        .where((entry) => DateUtils.isSameDay(
+              _appointmentDateForIndex(entry.key),
+              selected,
+            ))
+        .toList();
+
+    final listToShow = widget.showOnlyToday
+        ? filteredByDate.take(5).toList()
+        : filteredByDate;
     return Expanded(
       child: listToShow.isEmpty
           ? Center(
-              child: Text("No appointments today",
+              child: Text("No appointments on selected date",
                   style: TextStyle(fontFamily: 'Poppins', color: Colors.grey)))
           : ListView.builder(
               padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
               itemCount: listToShow.length,
               itemBuilder: (context, index) {
-                final appointment = listToShow[index];
+                final entry = listToShow[index];
+                final originalIndex = entry.key;
+                final appointment = entry.value;
                 final persistedStatus = _persistedStatuses[appointment.id];
                 final isPending =
                     persistedStatus != null && persistedStatus == 'Pending';
@@ -627,7 +690,7 @@ class AppointmentsPageState extends State<AppointmentsPage> {
                                 SizedBox(width: 12),
                                 _buildActionIcon(Icons.delete_outline, () {
                                   setState(() {
-                                    appointments.removeAt(index);
+                                    appointments.removeAt(originalIndex);
                                   });
                                 }, isDestructive: true),
                               ],
@@ -641,6 +704,199 @@ class AppointmentsPageState extends State<AppointmentsPage> {
               },
             ),
     );
+  }
+
+  Widget _buildCalendarDateFilter() {
+    final firstOfMonth = DateTime(_selectedDate.year, _selectedDate.month, 1);
+    final totalDays = _daysInMonth(_selectedDate);
+    final leadingEmptyCells = firstOfMonth.weekday % 7; // Sunday = 0
+    final totalCells = leadingEmptyCells + totalDays;
+    final weekCount = (totalCells / 7).ceil();
+    final monthYearLabel =
+        '${_monthLabel(_selectedDate.month)} ${_selectedDate.year}';
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 20),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFC4DAD2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              InkWell(
+                borderRadius: BorderRadius.circular(20),
+                onTap: () {
+                  setState(() {
+                    final prevMonth = DateTime(
+                      _selectedDate.year,
+                      _selectedDate.month - 1,
+                      1,
+                    );
+                    _selectedDate = prevMonth;
+                  });
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    _jumpToSelectedWeek();
+                  });
+                },
+                child: const Padding(
+                  padding: EdgeInsets.all(4),
+                  child: Icon(
+                    Icons.chevron_left_rounded,
+                    color: Color(0xFF6A9C89),
+                  ),
+                ),
+              ),
+              Expanded(
+                child: Center(
+                  child: Text(
+                monthYearLabel,
+                style: TextStyle(
+                  fontFamily: 'Poppins',
+                  fontWeight: FontWeight.w600,
+                  color: Colors.grey.shade800,
+                ),
+              ),
+                ),
+              ),
+              InkWell(
+                borderRadius: BorderRadius.circular(20),
+                onTap: () {
+                  setState(() {
+                    final nextMonth = DateTime(
+                      _selectedDate.year,
+                      _selectedDate.month + 1,
+                      1,
+                    );
+                    _selectedDate = nextMonth;
+                  });
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    _jumpToSelectedWeek();
+                  });
+                },
+                child: const Padding(
+                  padding: EdgeInsets.all(4),
+                  child: Icon(
+                    Icons.chevron_right_rounded,
+                    color: Color(0xFF6A9C89),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: Row(
+              children: const [
+                Expanded(child: Center(child: Text('S'))),
+                Expanded(child: Center(child: Text('M'))),
+                Expanded(child: Center(child: Text('T'))),
+                Expanded(child: Center(child: Text('W'))),
+                Expanded(child: Center(child: Text('T'))),
+                Expanded(child: Center(child: Text('F'))),
+                Expanded(child: Center(child: Text('S'))),
+              ],
+            ),
+          ),
+          const SizedBox(height: 4),
+          SizedBox(
+            height: 36,
+            child: PageView.builder(
+              controller: _weekPageController,
+              itemCount: weekCount,
+              itemBuilder: (context, weekIndex) {
+                return Row(
+                  children: List<Widget>.generate(7, (dayIndex) {
+                    final cellIndex = weekIndex * 7 + dayIndex;
+                    final dayNumber = cellIndex - leadingEmptyCells + 1;
+                    if (dayNumber < 1 || dayNumber > totalDays) {
+                      return const Expanded(child: SizedBox.shrink());
+                    }
+                    final date = DateTime(
+                      _selectedDate.year,
+                      _selectedDate.month,
+                      dayNumber,
+                    );
+                    final isSelected = DateUtils.isSameDay(date, _selectedDate);
+                    return Expanded(
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(12),
+                        onTap: () {
+                          setState(() {
+                            _selectedDate = date;
+                          });
+                        },
+                        child: Center(
+                          child: Container(
+                            width: 30,
+                            height: 30,
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: isSelected
+                                  ? Border.all(
+                                      color: const Color(0xFF6A9C89),
+                                      width: 1.6,
+                                    )
+                                  : null,
+                            ),
+                            child: Text(
+                              '$dayNumber',
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight:
+                                    isSelected ? FontWeight.w800 : FontWeight.w600,
+                                color: isSelected
+                                    ? const Color(0xFF6A9C89)
+                                    : Colors.black87,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  }),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _monthLabel(int month) {
+    switch (month) {
+      case 1:
+        return 'January';
+      case 2:
+        return 'February';
+      case 3:
+        return 'March';
+      case 4:
+        return 'April';
+      case 5:
+        return 'May';
+      case 6:
+        return 'June';
+      case 7:
+        return 'July';
+      case 8:
+        return 'August';
+      case 9:
+        return 'September';
+      case 10:
+        return 'October';
+      case 11:
+        return 'November';
+      default:
+        return 'December';
+    }
   }
 
   Widget _buildActionIcon(IconData icon, VoidCallback onTap,
