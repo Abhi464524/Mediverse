@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:mediverse/common/services/dio/api_service.dart';
 import 'package:mediverse/endPoints.dart';
+import 'package:mediverse/feature/doctorPages/model/emergency_appointment_model.dart';
 import 'package:mediverse/feature/doctorPages/model/doctor_profile_fetch_model.dart';
 import 'package:mediverse/feature/doctorPages/model/doctor_profile_update_model.dart';
 import 'package:mediverse/feature/doctorPages/model/patient_model.dart';
@@ -25,7 +26,7 @@ class DoctorRepo {
     DoctorProfileUpdateRequest request,
   ) async {
     final response = await _dioClient.post(
-      "http://192.168.0.108:3000/api/doctor-profile",
+      EndPoints.doctorProfileURL,
       data: request.toJson(),
     );
     final map = response.data is Map<String, dynamic>
@@ -38,7 +39,7 @@ class DoctorRepo {
     int doctorId, {
     DoctorProfileUpdateRequest? fallbackRequest,
   }) async {
-    const path = "http://192.168.0.108:3000/api/doctor-profile";
+    final path = EndPoints.doctorProfileURL;
     try {
       final response = await _dioClient.get(
         path,
@@ -75,5 +76,29 @@ class DoctorRepo {
       return data.first as Map<String, dynamic>;
     }
     return <String, dynamic>{};
+  }
+
+  Future<List<EmergencyAppointmentModel>> fetchEmergencyAppointments() async {
+    final response = await _dioClient.get(EndPoints.emergencyAppointmentsURL);
+    final payload = response.data;
+
+    if (payload is List) {
+      return payload
+          .whereType<Map<String, dynamic>>()
+          .map(EmergencyAppointmentModel.fromJson)
+          .toList();
+    }
+
+    if (payload is Map<String, dynamic>) {
+      final data = payload['data'];
+      if (data is List) {
+        return data
+            .whereType<Map<String, dynamic>>()
+            .map(EmergencyAppointmentModel.fromJson)
+            .toList();
+      }
+    }
+
+    return const <EmergencyAppointmentModel>[];
   }
 }

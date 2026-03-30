@@ -18,6 +18,11 @@ class DioClient {
     var dio = Dio();
     dio.options.connectTimeout = const Duration(milliseconds: 50000);
     dio.options.receiveTimeout = const Duration(milliseconds: 50000);
+    dio.options.headers = <String, dynamic>{
+      Headers.contentTypeHeader: Headers.jsonContentType,
+      // Required by loca.lt so tunnel does not serve the browser warning page to API clients.
+      'Bypass-Tunnel-Reminder': 'true',
+    };
     dio.interceptors.add(CurlInterceptor());
     dio.interceptors.add(LogInterceptor(
       requestBody: true,
@@ -152,9 +157,26 @@ class DioClient {
     } else if (e.type == DioExceptionType.badResponse) {
       final code = e.response?.statusCode;
       final detail = _httpErrorBodySummary(e.response?.data);
-      message = detail.isNotEmpty
-          ? 'HTTP $code: $detail'
-          : 'Received invalid status code: $code';
+      final host = e.requestOptions.uri.host;
+      final isLocaLt = host.endsWith('.loca.lt');
+      final ltStatus =
+          e.response?.headers.value('x-localtunnel-status')?.trim() ?? '';
+
+      // 408 from loca.lt: tunnel edge gave up waiting for your laptop to respond.
+      if (code == 408 && isLocaLt) {
+        message =
+            'Tunnel timeout — localtunnel did not get a reply from your PC in time. '
+            'Keep Node running on :3000, leave the tunnel terminal open, or use same Wi‑Fi + LAN IP.';
+      } else if (code == 503 &&
+          (ltStatus.isNotEmpty ||
+              detail.toLowerCase().contains('tunnel unavailable'))) {
+        message =
+            'Tunnel unavailable — start localtunnel (or your deployed API) and match ApiConfig.';
+      } else {
+        message = detail.isNotEmpty
+            ? 'HTTP $code: $detail'
+            : 'Received invalid status code: $code';
+      }
     } else if (e.type == DioExceptionType.cancel) {
       message = "Request to API server was cancelled";
     } else if (e.type == DioExceptionType.connectionError) {

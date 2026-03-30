@@ -1,6 +1,8 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:get/get.dart';
+import 'common/config/api_config.dart';
 import 'common/services/storage_service.dart';
 import 'common/view/user_selection_view.dart';
 import 'feature/doctorPages/view/doctor_homepage_view.dart';
@@ -9,6 +11,7 @@ import 'common/translations.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  debugPrint('Mediverse compiled API base: ${ApiConfig.baseUrl}');
   await Firebase.initializeApp();
   final storage = await StorageService.getInstance();
 

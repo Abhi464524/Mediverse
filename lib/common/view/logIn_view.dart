@@ -41,6 +41,16 @@ class _LogInPageState extends State<LogInPage> {
   static const Color _sage = Color(0xFF6A9C89);
   static const Color _mintBg = Color(0xFFF8FBF9);
 
+  /// Prefer backend body; strip generic `HTTP <code>: ` prefix from [DioClient] errors.
+  String _loginErrorForSnack(String? raw) {
+    if (raw == null || raw.trim().isEmpty) return 'Login failed';
+    final s = raw.trim();
+    final m = RegExp(r'^HTTP \d+:\s*(.+)$').firstMatch(s);
+    return (m != null && m.group(1)!.trim().isNotEmpty)
+        ? m.group(1)!.trim()
+        : s;
+  }
+
   InputDecoration _loginFieldDecoration({
     required String label,
     required IconData icon,
@@ -101,19 +111,33 @@ class _LogInPageState extends State<LogInPage> {
         password: _loginWithPhone ? "" : inputPass,
         otp: "",
         role: widget.role,
+        showErrorSnackbar: false,
       );
 
       if (!mounted) return;
 
       if (user == null) {
+        final msg = _loginErrorForSnack(_authController.lastLoginError);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Invalid credentials")),
+          SnackBar(content: Text(msg)),
         );
         return;
       }
 
-      String role = user.role;
-      if (role != widget.role.toLowerCase()) {
+      if (!user.success) {
+        final msg = user.message.trim().isNotEmpty
+            ? user.message
+            : 'Invalid credentials';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(msg)),
+        );
+        return;
+      }
+
+      final expectedRole = widget.role.toLowerCase();
+      final returnedRole = user.role.trim().toLowerCase();
+      final role = returnedRole.isNotEmpty ? returnedRole : expectedRole;
+      if (role != expectedRole) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text("Invalid credentials or role")),
         );
@@ -123,8 +147,11 @@ class _LogInPageState extends State<LogInPage> {
       final String name = user.username.isEmpty
           ? (_loginWithPhone ? inputPhone : inputName)
           : user.username;
-      String speciality = user.speciality;
       final storage = await StorageService.getInstance();
+      final existingProfile = await storage.getCurrentUserProfile();
+      final speciality = user.speciality.isNotEmpty
+          ? user.speciality
+          : (existingProfile?['speciality'] ?? '');
       await storage.setCurrentSession(
         username: name,
         role: role,
@@ -146,7 +173,6 @@ class _LogInPageState extends State<LogInPage> {
   }
 
   String _firebasePhoneE164(String phoneDigits) {
-    // Your UI uses exactly 10 digits; Firebase requires E.164 format like +91XXXXXXXXXX.
     return '$_firebaseCountryCode$phoneDigits';
   }
 
@@ -254,32 +280,47 @@ class _LogInPageState extends State<LogInPage> {
       final response = await authController.login(
         firebaseIdToken: firebaseIdToken,
         role: widget.role,
+        showErrorSnackbar: false,
       );
 
       if (!mounted) return;
       if (response == null || !response.success) {
-        throw Exception(
-          response?.message.isNotEmpty == true
-              ? response!.message
-              : 'Phone login failed',
+        final String msg;
+        if (response != null && response.message.trim().isNotEmpty) {
+          msg = response.message.trim();
+        } else {
+          msg = _loginErrorForSnack(authController.lastLoginError);
+        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(msg)),
         );
+        return;
       }
 
       // Persist a local session so app can restore on restart.
       final storage = await StorageService.getInstance();
+      final existingProfile = await storage.getCurrentUserProfile();
+      final existingName = (existingProfile?['username'] ?? '').trim();
+      final existingSpeciality = (existingProfile?['speciality'] ?? '').trim();
+      final resolvedName = response.username.isNotEmpty
+          ? response.username
+          : (existingName.isNotEmpty ? existingName : phoneDigits);
+      final resolvedSpeciality = response.speciality.isNotEmpty
+          ? response.speciality
+          : existingSpeciality;
       await storage.setCurrentSession(
-        username: response.username.isNotEmpty ? response.username : phoneDigits,
+        username: resolvedName,
         role: response.role.isNotEmpty ? response.role : widget.role,
         phoneNumber: response.phoneNumber.isNotEmpty
             ? response.phoneNumber
             : phoneDigits,
-        speciality: response.speciality,
+        speciality: resolvedSpeciality,
       );
 
       final roleLower = (response.role.isNotEmpty ? response.role : widget.role)
           .toLowerCase();
-      final name = response.username.isNotEmpty ? response.username : phoneDigits;
-      final speciality = response.speciality;
+      final name = resolvedName;
+      final speciality = resolvedSpeciality;
 
       if (roleLower == "doctor") {
         Get.off(DoctorHomePage(name: name, speciality: speciality));

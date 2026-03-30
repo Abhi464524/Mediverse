@@ -11,6 +11,7 @@ import 'appointments_view.dart';
 import 'doctor_profile_view.dart';
 import 'edit_doctor_profile_view.dart';
 import 'digital_prescription_view.dart';
+import 'emergency_appointments_view.dart';
 
 class DoctorHomePage extends StatefulWidget {
   final String name;
@@ -664,11 +665,7 @@ class _DoctorHomePageState extends State<DoctorHomePage> {
                   icon: Icons.emergency,
                   label: 'emergency'.tr,
                   color: const Color(0xFFFFC0C0), // Soft Rose
-                  onTap: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text("Emergency contacts opened")),
-                    );
-                  },
+                  onTap: () => Get.to(() => const EmergencyAppointmentsPage()),
                 ),
               ),
             ],

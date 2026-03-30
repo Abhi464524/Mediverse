@@ -10,6 +10,9 @@ class AuthController extends GetxController {
 
   final isLoading = false.obs;
 
+  /// Set when [login] throws (e.g. HTTP error); use for snackbars. Cleared each attempt.
+  String? lastLoginError;
+
   Future<AuthResponseModel?> login({
     String username = "",
     String phoneNumber = "",
@@ -18,7 +21,9 @@ class AuthController extends GetxController {
     String firebaseIdToken = "",
     required String role,
     String speciality = "",
+    bool showErrorSnackbar = true,
   }) async {
+    lastLoginError = null;
     try {
       isLoading.value = true;
       final request = AuthRequestModel(
@@ -38,7 +43,10 @@ class AuthController extends GetxController {
     } catch (e, stackTrace) {
       debugPrint('AuthController.login error: $e');
       debugPrint('$stackTrace');
-      Get.snackbar("Error", "Login failed: $e");
+      lastLoginError = e.toString();
+      if (showErrorSnackbar) {
+        Get.snackbar("Error", lastLoginError!);
+      }
       return null;
     } finally {
       isLoading.value = false;

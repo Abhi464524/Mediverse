@@ -2,19 +2,28 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Mediverse · physical device (API on Mac)",
+      "name": "Mediverse · localtunnel (dart-define)",
       "request": "launch",
       "type": "dart",
       "program": "lib/main.dart",
       "toolArgs": [
-        "--dart-define=API_BASE_URL=http://192.168.0.108:3000/api"
+        "--dart-define=API_BASE_URL=https://mediverse-api-rathi.loca.lt/api"
       ]
     },
     {
-      "name": "Mediverse · localhost (simulator / desktop)",
+      "name": "Mediverse · run (uses default in api_config.dart)",
       "request": "launch",
       "type": "dart",
       "program": "lib/main.dart"
+    },
+    {
+      "name": "Mediverse · LAN dart-define example",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/main.dart",
+      "toolArgs": [
+        "--dart-define=API_BASE_URL=http://10.10.81.218:3000/api"
+      ]
     }
   ]
 }

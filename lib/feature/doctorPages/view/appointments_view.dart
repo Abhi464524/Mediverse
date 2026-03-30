@@ -10,10 +10,8 @@ import '../../../common/utils/phone_launcher.dart' show launchCallWithLoader;
 import '../../../common/services/storage_service.dart';
 
 class AppointmentsPage extends StatefulWidget {
-  /// When true, show only today's appointments (e.g. when opened from "Today's Appointments" card).
   final bool showOnlyToday;
 
-  /// When true, automatically open the "Add New Patient" dialog on startup.
   final bool showAddPatient;
 
   const AppointmentsPage({

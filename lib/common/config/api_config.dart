@@ -1,16 +1,39 @@
+/// REST API root used by [EndPoints].
+///
+/// **Single source of truth at build time** — no runtime IP / URL UI. Use your
+/// deployed server’s **HTTPS hostname** (e.g. `https://api.yourdomain.com/api`),
+/// never a LAN IP, for store releases.
+///
+/// **Ways to set the URL**
+/// - **CI / release:**  
+///   `flutter build apk --dart-define=API_BASE_URL=https://api.yourdomain.com/api`
+/// - **Local dev:** same flag, or rely on [defaultValue] below (tunnel URL).
+///
+/// **localtunnel:** the printed `https://….loca.lt` URL often changes each run; free
+/// tier may ignore `--subdomain`. When it changes, update [defaultValue] below or use
+/// `--dart-define=API_BASE_URL=...`.
+///
+/// [DioClient] sends `Bypass-Tunnel-Reminder: true` for `*.loca.lt` (harmless on other hosts).
 class ApiConfig {
-  /// REST API root used by [EndPoints].
-  ///
-  /// **Physical phone or tablet:** `localhost` is the device, not your PC.
-  /// Use your computer’s Wi‑Fi IP (same network as the phone), e.g.
-  /// `flutter run --dart-define=API_BASE_URL=http://192.168.1.42:3000/api`
-  /// (replace with your machine’s IP; on macOS: `ipconfig getifaddr en0`).
-  ///
-  /// **Android emulator:** `flutter run --dart-define=API_BASE_URL=http://10.0.2.2:3000/api`
-  ///
-  /// **iOS Simulator / desktop:** default `http://localhost:3000/api` is fine.
-  static const String baseUrl = String.fromEnvironment(
+  static const String _fromEnv = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://localhost:3000/api',
+    defaultValue: 'https://mediverse-api-rathi.loca.lt/api',
   );
+
+  /// Normalized base (trailing slashes stripped; ensures `/api` suffix).
+  static String get baseUrl => _normalizeBase(_fromEnv);
+
+  static String _normalizeBase(String raw) {
+    var s = raw.trim();
+    if (s.isEmpty) {
+      return 'https://mediverse-api-rathi.loca.lt/api';
+    }
+    while (s.endsWith('/')) {
+      s = s.substring(0, s.length - 1);
+    }
+    if (!s.endsWith('/api')) {
+      s = '$s/api';
+    }
+    return s;
+  }
 }

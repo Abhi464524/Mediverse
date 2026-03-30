@@ -34,8 +34,13 @@ class AuthResponseModel {
         parsedToken.isNotEmpty ||
         userMap.isNotEmpty;
 
+    final explicit = json["success"];
+    final success = explicit == false
+        ? false
+        : explicit == true || hasPositiveSignal;
+
     return AuthResponseModel(
-      success: json["success"] == true || hasPositiveSignal,
+      success: success,
       message: (json["message"] ?? "").toString(),
       username: parsedUsername,
       phoneNumber: (json["phoneNumber"] ?? userMap["phoneNumber"] ?? "").toString(),
