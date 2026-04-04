@@ -14,6 +14,7 @@ class EndPoints {
   static String get medicineDetailsURL => '$baseURL/medicines';
   static String get doctorProfileURL => '$baseURL/doctor-profile';
   static String get addPatientURL => '$baseURL/add-patient';
+  static String get doctorAppointmentsURL => '$baseURL/doctor/appointments';
   static String get emergencyAppointmentsURL =>
       '$baseURL/doctor/emergency-appointments';
 

@@ -61,6 +61,8 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return GetMaterialApp(
       debugShowCheckedModeBanner: false,
+      defaultTransition: Transition.fadeIn,
+      transitionDuration: const Duration(milliseconds: 200),
       title: "Mediverse",
       translations: AppTranslations(),
       locale: Locale(languageCode.split('_')[0],

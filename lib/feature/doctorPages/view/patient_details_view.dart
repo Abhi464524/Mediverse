@@ -24,6 +24,20 @@ class _PatientDetailsState extends State<PatientDetails> {
   String notes = "";
   TextEditingController? _notesController;
   late String _selectedStatus;
+
+  /// Whether this patient came from an emergency appointment.
+  bool get _isEmergency =>
+      (widget.patient.appointment?.symptoms ?? '')
+          .toLowerCase()
+          .contains('emergency');
+
+  // Emergency color palette
+  Color get _accentColor =>
+      _isEmergency ? const Color(0xFFE53935) : const Color(0xFF6A9C89);
+  Color get _accentLight =>
+      _isEmergency ? const Color(0xFFFFCDD2) : const Color(0xFFC4DAD2);
+  Color get _accentBg =>
+      _isEmergency ? const Color(0xFFFFF5F5) : const Color(0xFFF8FBF9);
   List<String> _savedNotes = <String>[];
   List<Map<String, String>> _attachments = <Map<String, String>>[];
 
@@ -72,7 +86,7 @@ class _PatientDetailsState extends State<PatientDetails> {
           Row(
             children: [
               Icon(Icons.check_circle_outline,
-                  color: const Color(0xFF6A9C89), size: 20),
+                  color: _accentColor, size: 20),
               SizedBox(width: 8),
               Text(
                 "Appointment Status",
@@ -97,10 +111,10 @@ class _PatientDetailsState extends State<PatientDetails> {
             children: options.map((status) {
               bool isSelected = _selectedStatus == status;
               Color activeColor = status == 'Done'
-                  ? const Color(0xFF6A9C89)
+                  ? _accentColor
                   : (status == 'Not Visited'
                       ? Colors.redAccent
-                      : const Color(0xFFC4DAD2));
+                      : _accentLight);
 
               String label = status;
               if (status == 'Scheduled' && hasPassed) {
@@ -176,7 +190,7 @@ class _PatientDetailsState extends State<PatientDetails> {
     _lastVisitController =
         TextEditingController(text: widget.patient.medicalHistory?.lastVisitDate ?? "");
     _appointmentTimeController =
-        TextEditingController(text: widget.patient.appointment?.scheduledTime ?? "N/A");
+        TextEditingController(text: _formatTimeWithDay(widget.patient.appointment?.scheduledTime ?? "N/A"));
     _symptomsController = TextEditingController(text: widget.patient.appointment?.symptoms ?? "");
     _diagnosisController =
         TextEditingController(text: widget.patient.appointment?.diagnosis ?? "");
@@ -381,6 +395,30 @@ class _PatientDetailsState extends State<PatientDetails> {
     }
   }
 
+  String _formatTimeWithDay(String timeStr) {
+    if (timeStr.isEmpty || timeStr == 'N/A') return timeStr;
+    final parsed = _parseTime(timeStr);
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final diff = DateTime(parsed.year, parsed.month, parsed.day)
+        .difference(today)
+        .inDays;
+
+    String dayLabel;
+    if (diff == 0) {
+      dayLabel = 'Today';
+    } else if (diff == 1) {
+      dayLabel = 'Tomorrow';
+    } else if (diff == -1) {
+      dayLabel = 'Yesterday';
+    } else {
+      final dd = parsed.day.toString().padLeft(2, '0');
+      final mm = parsed.month.toString().padLeft(2, '0');
+      dayLabel = '$dd-$mm';
+    }
+    return '$dayLabel, $timeStr';
+  }
+
   bool get _hasAppointmentPassed {
     if (widget.appointment == null) return false;
     final appTime = _parseTime(widget.appointment!.time);
@@ -407,10 +445,10 @@ class _PatientDetailsState extends State<PatientDetails> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FBF9), // Pale Mint
+      backgroundColor: _accentBg, // Pale Mint
       appBar: AppBar(
         title: Text(
-          "Patient Details",
+          _isEmergency ? "Emergency Patient Details" : "Patient Details",
           style: TextStyle(
               color: Colors.black,
               fontWeight: FontWeight.bold,
@@ -454,12 +492,12 @@ class _PatientDetailsState extends State<PatientDetails> {
                           icon: Icon(
                             Icons.save,
                             size: 18,
-                            color: const Color(0xFF6A9C89),
+                            color: _accentColor,
                           ),
                           label: Text(
                             "Save Details",
                             style: TextStyle(
-                              color: const Color(0xFF6A9C89),
+                              color: _accentColor,
                               fontFamily: 'Poppins',
                               fontWeight: FontWeight.w600,
                             ),
@@ -485,7 +523,7 @@ class _PatientDetailsState extends State<PatientDetails> {
                       Row(
                         children: [
                           Icon(Icons.attach_file,
-                              size: 18, color: const Color(0xFF6A9C89)),
+                              size: 18, color: _accentColor),
                           SizedBox(width: 8),
                           Text(
                             "Reports / Attachments",
@@ -500,11 +538,11 @@ class _PatientDetailsState extends State<PatientDetails> {
                           TextButton.icon(
                             onPressed: _pickAndUploadFile,
                             icon: Icon(Icons.cloud_upload,
-                                size: 18, color: const Color(0xFF6A9C89)),
+                                size: 18, color: _accentColor),
                             label: Text(
                               "Upload",
                               style: TextStyle(
-                                color: const Color(0xFF6A9C89),
+                                color: _accentColor,
                                 fontFamily: 'Poppins',
                                 fontWeight: FontWeight.w600,
                               ),
@@ -517,7 +555,7 @@ class _PatientDetailsState extends State<PatientDetails> {
                         Divider(
                           height: 1,
                           thickness: 1,
-                          color: const Color(0xFFC4DAD2).withOpacity(0.7),
+                          color: _accentLight.withOpacity(0.7),
                         ),
                         ListView.separated(
                           shrinkWrap: true,
@@ -526,7 +564,7 @@ class _PatientDetailsState extends State<PatientDetails> {
                           itemCount: _attachments.length,
                           separatorBuilder: (_, __) => Divider(
                             height: 8,
-                            color: const Color(0xFFC4DAD2).withOpacity(0.5),
+                            color: _accentLight.withOpacity(0.5),
                           ),
                           itemBuilder: (context, index) {
                             final file = _attachments[index];
@@ -541,7 +579,7 @@ class _PatientDetailsState extends State<PatientDetails> {
                                     ? Icons.picture_as_pdf
                                     : Icons.insert_drive_file,
                                 size: 20,
-                                color: const Color(0xFF6A9C89),
+                                color: _accentColor,
                               ),
                               title: Text(
                                 name,
@@ -575,12 +613,12 @@ class _PatientDetailsState extends State<PatientDetails> {
                           icon: Icon(
                             Icons.save,
                             size: 18,
-                            color: const Color(0xFF6A9C89),
+                            color: _accentColor,
                           ),
                           label: Text(
                             "Save Details",
                             style: TextStyle(
-                              color: const Color(0xFF6A9C89),
+                              color: _accentColor,
                               fontFamily: 'Poppins',
                               fontWeight: FontWeight.w600,
                             ),
@@ -607,12 +645,12 @@ class _PatientDetailsState extends State<PatientDetails> {
                           icon: Icon(
                             Icons.save,
                             size: 18,
-                            color: const Color(0xFF6A9C89),
+                            color: _accentColor,
                           ),
                           label: Text(
                             "Save Details",
                             style: TextStyle(
-                              color: const Color(0xFF6A9C89),
+                              color: _accentColor,
                               fontFamily: 'Poppins',
                               fontWeight: FontWeight.w600,
                             ),
@@ -638,7 +676,7 @@ class _PatientDetailsState extends State<PatientDetails> {
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
-        color: const Color(0xFFC4DAD2).withOpacity(0.3), // Soft Sage Light
+        color: _accentLight.withOpacity(0.3), // Soft Sage Light
         borderRadius: BorderRadius.only(
           bottomLeft: Radius.circular(40),
           bottomRight: Radius.circular(40),
@@ -654,7 +692,7 @@ class _PatientDetailsState extends State<PatientDetails> {
               color: Colors.white,
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFF6A9C89)
+                  color: _accentColor
                       .withOpacity(0.2), // Sage Green Shadow
                   blurRadius: 15,
                   offset: Offset(0, 5),
@@ -663,7 +701,7 @@ class _PatientDetailsState extends State<PatientDetails> {
             ),
             child: CircleAvatar(
               radius: 50,
-              backgroundColor: const Color(0xFFC4DAD2),
+              backgroundColor: _accentLight,
               child: Icon(Icons.person, size: 60, color: Colors.white),
             ),
           ),
@@ -681,7 +719,7 @@ class _PatientDetailsState extends State<PatientDetails> {
           Container(
             padding: EdgeInsets.symmetric(horizontal: 16, vertical: 6),
             decoration: BoxDecoration(
-              color: const Color(0xFF6A9C89), // Sage Green
+              color: _accentColor, // Sage Green
               borderRadius: BorderRadius.circular(20),
             ),
             child: Text(
@@ -719,7 +757,7 @@ class _PatientDetailsState extends State<PatientDetails> {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: const Color(0xFFC4DAD2).withOpacity(0.5)),
+          border: Border.all(color: _accentLight.withOpacity(0.5)),
           boxShadow: [
             BoxShadow(
               color: Colors.grey.withOpacity(0.05),
@@ -730,7 +768,7 @@ class _PatientDetailsState extends State<PatientDetails> {
         ),
         child: Column(
           children: [
-            Icon(icon, color: const Color(0xFF6A9C89), size: 24),
+            Icon(icon, color: _accentColor, size: 24),
             SizedBox(height: 8),
             Text(
               value,
@@ -777,7 +815,7 @@ class _PatientDetailsState extends State<PatientDetails> {
         children: [
           Row(
             children: [
-              Icon(icon, color: const Color(0xFF6A9C89), size: 20),
+              Icon(icon, color: _accentColor, size: 20),
               SizedBox(width: 8),
               Text(
                 title,
@@ -840,7 +878,7 @@ class _PatientDetailsState extends State<PatientDetails> {
                     ),
                     focusedBorder: UnderlineInputBorder(
                       borderSide: BorderSide(
-                          color: const Color(0xFF6A9C89), width: 1.5),
+                          color: _accentColor, width: 1.5),
                     ),
                   ),
                 ),
@@ -871,7 +909,7 @@ class _PatientDetailsState extends State<PatientDetails> {
         children: [
           Row(
             children: [
-              Icon(Icons.edit_note, color: const Color(0xFF6A9C89), size: 24),
+              Icon(Icons.edit_note, color: _accentColor, size: 24),
               SizedBox(width: 8),
               Text(
                 "Doctor's Notes",
@@ -886,11 +924,11 @@ class _PatientDetailsState extends State<PatientDetails> {
               TextButton.icon(
                 onPressed: _addNote,
                 icon:
-                    Icon(Icons.save, color: const Color(0xFF6A9C89), size: 18),
+                    Icon(Icons.save, color: _accentColor, size: 18),
                 label: Text(
                   "Add",
                   style: TextStyle(
-                    color: const Color(0xFF6A9C89),
+                    color: _accentColor,
                     fontFamily: 'Poppins',
                     fontWeight: FontWeight.w600,
                   ),
@@ -902,10 +940,10 @@ class _PatientDetailsState extends State<PatientDetails> {
           if (_savedNotes.isNotEmpty) ...[
             Container(
               decoration: BoxDecoration(
-                color: const Color(0xFFF8FBF9),
+                color: _accentBg,
                 borderRadius: BorderRadius.circular(12),
                 border:
-                    Border.all(color: const Color(0xFFC4DAD2).withOpacity(0.5)),
+                    Border.all(color: _accentLight.withOpacity(0.5)),
               ),
               child: ListView.separated(
                 shrinkWrap: true,
@@ -914,7 +952,7 @@ class _PatientDetailsState extends State<PatientDetails> {
                 itemCount: _savedNotes.length,
                 separatorBuilder: (_, __) => Divider(
                   height: 12,
-                  color: const Color(0xFFC4DAD2).withOpacity(0.4),
+                  color: _accentLight.withOpacity(0.4),
                 ),
                 itemBuilder: (context, index) {
                   final parsed = _parseStoredNote(_savedNotes[index]);
@@ -948,10 +986,10 @@ class _PatientDetailsState extends State<PatientDetails> {
           ],
           Container(
             decoration: BoxDecoration(
-              color: const Color(0xFFF8FBF9), // Pale Mint
+              color: _accentBg, // Pale Mint
               borderRadius: BorderRadius.circular(12),
               border:
-                  Border.all(color: const Color(0xFFC4DAD2).withOpacity(0.5)),
+                  Border.all(color: _accentLight.withOpacity(0.5)),
             ),
             child: TextField(
               controller: notesController,
@@ -994,7 +1032,7 @@ class _PatientDetailsState extends State<PatientDetails> {
                 "Call",
                 Icons.call,
                 Colors.white,
-                const Color(0xFF6A9C89), // Sage Green
+                _accentColor, // Sage Green
                 _callHardcodedNumber,
               ),
             ),
@@ -1003,7 +1041,7 @@ class _PatientDetailsState extends State<PatientDetails> {
               child: _buildActionButton(
                 "Message",
                 Icons.message,
-                const Color(0xFF6A9C89), // Sage Green
+                _accentColor, // Sage Green
                 Colors.white,
                 () => ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(content: Text("Opening message..."))),
@@ -1034,7 +1072,7 @@ class _PatientDetailsState extends State<PatientDetails> {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
           side: bgColor == Colors.white
-              ? BorderSide(color: const Color(0xFF6A9C89))
+              ? BorderSide(color: _accentColor)
               : BorderSide.none,
         ),
         elevation: 0,

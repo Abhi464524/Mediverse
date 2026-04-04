@@ -26,6 +26,7 @@ class StorageService {
   static const String _currentPhoneKey = 'current_phone';
   static const String _currentRoleKey = 'current_role';
   static const String _currentSpecialityKey = 'current_speciality';
+  static const String _currentUserIdKey = 'current_user_id';
   static const String _appointmentStatusPrefix = 'appointment_status_';
   static const String _patientNotesPrefix = 'patient_notes_';
   static const String _patientFilesPrefix = 'patient_files_';
@@ -112,11 +113,13 @@ class StorageService {
       final phoneNumber = prefs.getString(_currentPhoneKey) ?? '';
       final role = prefs.getString(_currentRoleKey) ?? '';
       final speciality = prefs.getString(_currentSpecialityKey) ?? '';
+      final userId = prefs.getString(_currentUserIdKey) ?? '';
       return {
         'username': username,
         'phoneNumber': phoneNumber,
         'role': role,
         'speciality': speciality,
+        'userId': userId,
       };
     } catch (e) {
       print("❌ Error getting local user profile: $e");
@@ -130,6 +133,7 @@ class StorageService {
     required String role,
     String phoneNumber = '',
     String speciality = '',
+    String userId = '',
   }) async {
     final prefs = _prefs;
     if (prefs == null) return;
@@ -137,6 +141,9 @@ class StorageService {
     await prefs.setString(_currentPhoneKey, phoneNumber);
     await prefs.setString(_currentRoleKey, role.toLowerCase());
     await prefs.setString(_currentSpecialityKey, speciality);
+    if (userId.isNotEmpty) {
+      await prefs.setString(_currentUserIdKey, userId);
+    }
   }
 
   /// Convenience helper: returns the current doctor's display name (username).

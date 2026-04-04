@@ -70,6 +70,31 @@ class _DoctorHomePageState extends State<DoctorHomePage> {
     return DateTime(now.year, now.month, now.day, hour, minute);
   }
 
+  /// Returns a display string with a day label prefix.
+  /// e.g. "Today, 10:00 AM" or "05-04, 10:00 AM"
+  String _formatTimeWithDay(String timeStr) {
+    final parsed = _parseTime(timeStr);
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final diff = DateTime(parsed.year, parsed.month, parsed.day)
+        .difference(today)
+        .inDays;
+
+    String dayLabel;
+    if (diff == 0) {
+      dayLabel = 'Today';
+    } else if (diff == 1) {
+      dayLabel = 'Tomorrow';
+    } else if (diff == -1) {
+      dayLabel = 'Yesterday';
+    } else {
+      final dd = parsed.day.toString().padLeft(2, '0');
+      final mm = parsed.month.toString().padLeft(2, '0');
+      dayLabel = '$dd-$mm';
+    }
+    return '$dayLabel, $timeStr';
+  }
+
   List<AppointmentModel> get upcomingAppointments {
     final now = DateTime.now();
     return appointments
@@ -521,7 +546,7 @@ class _DoctorHomePageState extends State<DoctorHomePage> {
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: Text(
-                                  appointment.time,
+                                  _formatTimeWithDay(appointment.time),
                                   style: TextStyle(
                                     color:
                                         isNext ? Colors.white : Colors.black87,

@@ -37,6 +37,22 @@ class AppointmentsPageState extends State<AppointmentsPage> {
     '06:00 PM',
   ];
   DateTime _selectedDate = DateTime.now();
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+  bool _calendarExpanded = true;
+
+  String _formatDateParam(DateTime d) =>
+      '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+
+  /// Calls the API via controller. Search ignores date filter.
+  Future<void> _fetchAppointments() async {
+    await _patientController.fetchAppointments(
+      date: _searchQuery.isEmpty ? _formatDateParam(_selectedDate) : null,
+      search: _searchQuery.isNotEmpty ? _searchQuery : null,
+    );
+  }
+
+  List<AppointmentModel> get appointments => _patientController.appointments;
 
   Future<void> _callHardcodedNumber() async {
     await launchCallWithLoader(context, _hardcodedPhoneNumber);
@@ -62,6 +78,29 @@ class AppointmentsPageState extends State<AppointmentsPage> {
     }
   }
 
+  String _formatTimeWithDay(String timeStr) {
+    final parsed = _parseTime(timeStr);
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final diff = DateTime(parsed.year, parsed.month, parsed.day)
+        .difference(today)
+        .inDays;
+
+    String dayLabel;
+    if (diff == 0) {
+      dayLabel = 'Today';
+    } else if (diff == 1) {
+      dayLabel = 'Tomorrow';
+    } else if (diff == -1) {
+      dayLabel = 'Yesterday';
+    } else {
+      final dd = parsed.day.toString().padLeft(2, '0');
+      final mm = parsed.month.toString().padLeft(2, '0');
+      dayLabel = '$dd-$mm';
+    }
+    return '$dayLabel, $timeStr';
+  }
+
   bool _hasAppointmentPassed(AppointmentModel app) {
     final appTime = _parseTime(app.time);
     return DateTime.now().isAfter(appTime);
@@ -70,12 +109,6 @@ class AppointmentsPageState extends State<AppointmentsPage> {
   DateTime _dateOnly(DateTime value) =>
       DateTime(value.year, value.month, value.day);
 
-  DateTime _appointmentDateForIndex(int index) {
-    // Since sample data has no explicit date, spread records across days.
-    final base = _dateOnly(DateTime.now());
-    final dayOffset = index ~/ 5;
-    return base.add(Duration(days: dayOffset));
-  }
 
   int _daysInMonth(DateTime date) {
     final firstOfNextMonth = (date.month == 12)
@@ -90,6 +123,7 @@ class AppointmentsPageState extends State<AppointmentsPage> {
     _selectedDate = _dateOnly(DateTime.now());
     _weekPageController =
         PageController(initialPage: _selectedWeekIndexForMonth(_selectedDate));
+    _fetchAppointments();
     _loadPersistedStatuses();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _jumpToSelectedWeek(animate: false);
@@ -104,6 +138,7 @@ class AppointmentsPageState extends State<AppointmentsPage> {
   @override
   void dispose() {
     _weekPageController.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -148,59 +183,6 @@ class AppointmentsPageState extends State<AppointmentsPage> {
     }
   }
 
-  // Using AppointmentModel
-  final List<AppointmentModel> appointments = [
-    AppointmentModel(
-        id: '1',
-        patientName: "Patient 1",
-        time: "10:00 AM",
-        diagnosis: "Derma"),
-    AppointmentModel(
-        id: '2',
-        patientName: "Patient 2",
-        time: "11:30 AM",
-        diagnosis: "Derma"),
-    AppointmentModel(
-        id: '3',
-        patientName: "Patient 3",
-        time: "02:00 PM",
-        diagnosis: "Derma"),
-    AppointmentModel(
-        id: '4',
-        patientName: "Patient 4",
-        time: "04:15 PM",
-        diagnosis: "Derma"),
-    AppointmentModel(
-        id: '5',
-        patientName: "Patient 5",
-        time: "06:00 PM",
-        diagnosis: "Derma"),
-    AppointmentModel(
-        id: '6',
-        patientName: "Patient 6",
-        time: "10:00 AM",
-        diagnosis: "Derma"),
-    AppointmentModel(
-        id: '7',
-        patientName: "Patient 7",
-        time: "11:30 AM",
-        diagnosis: "Derma"),
-    AppointmentModel(
-        id: '8',
-        patientName: "Patient 8",
-        time: "02:00 PM",
-        diagnosis: "Derma"),
-    AppointmentModel(
-        id: '9',
-        patientName: "Patient 9",
-        time: "04:15 PM",
-        diagnosis: "Derma"),
-    AppointmentModel(
-        id: '10',
-        patientName: "Patient 10",
-        time: "06:00 PM",
-        diagnosis: "Derma"),
-  ];
 
   void _addPatients() {
     TextEditingController nameController = TextEditingController();
@@ -458,7 +440,16 @@ class AppointmentsPageState extends State<AppointmentsPage> {
         padding: EdgeInsets.only(top: 10),
         child: Column(
           children: [
-            _buildCalendarDateFilter(),
+            AnimatedCrossFade(
+              firstChild: _buildCalendarDateFilter(),
+              secondChild: _buildCollapsedDateChip(),
+              crossFadeState: _calendarExpanded
+                  ? CrossFadeState.showFirst
+                  : CrossFadeState.showSecond,
+              duration: const Duration(milliseconds: 250),
+            ),
+            SizedBox(height: 10),
+            _buildSearchBar(),
             SizedBox(height: 10),
             _buildAppointmentsSection(),
             SizedBox(height: 80),
@@ -469,33 +460,134 @@ class AppointmentsPageState extends State<AppointmentsPage> {
     );
   }
 
+  Widget _buildCollapsedDateChip() {
+    final dd = _selectedDate.day.toString().padLeft(2, '0');
+    final mmm = _monthLabel(_selectedDate.month).substring(0, 3);
+    final label = '$dd $mmm ${_selectedDate.year}';
+
+    return GestureDetector(
+      onTap: () => setState(() => _calendarExpanded = true),
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 20),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFFC4DAD2)),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.calendar_today_rounded,
+                size: 18, color: Color(0xFF6A9C89)),
+            const SizedBox(width: 10),
+            Text(
+              label,
+              style: TextStyle(
+                fontFamily: 'Poppins',
+                fontWeight: FontWeight.w600,
+                fontSize: 14,
+                color: Colors.grey.shade800,
+              ),
+            ),
+            const Spacer(),
+            const Icon(Icons.keyboard_arrow_down_rounded,
+                color: Color(0xFF6A9C89)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSearchBar() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: TextField(
+        controller: _searchController,
+        onChanged: (value) {
+          setState(() => _searchQuery = value.trim().toLowerCase());
+          _fetchAppointments();
+        },
+        decoration: InputDecoration(
+          hintText: 'Search by name or phone...',
+          hintStyle: TextStyle(
+            fontFamily: 'Poppins',
+            color: Colors.grey.shade400,
+            fontSize: 14,
+          ),
+          prefixIcon: Icon(Icons.search, color: const Color(0xFF6A9C89)),
+          suffixIcon: _searchQuery.isNotEmpty
+              ? IconButton(
+                  icon: Icon(Icons.clear, color: Colors.grey.shade400, size: 20),
+                  onPressed: () {
+                    _searchController.clear();
+                    setState(() => _searchQuery = '');
+                    _fetchAppointments();
+                  },
+                )
+              : null,
+          filled: true,
+          fillColor: Colors.white,
+          contentPadding: const EdgeInsets.symmetric(vertical: 12),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: BorderSide(color: const Color(0xFFC4DAD2)),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: BorderSide(color: const Color(0xFFC4DAD2)),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: BorderSide(color: const Color(0xFF6A9C89), width: 1.5),
+          ),
+        ),
+        style: TextStyle(fontFamily: 'Poppins', fontSize: 14),
+      ),
+    );
+  }
+
   Widget _buildAppointmentsSection() {
-    final indexedAppointments = appointments.asMap().entries.toList()
-      ..sort((a, b) => _parseTime(a.value.time).compareTo(_parseTime(b.value.time)));
+    // Data comes from the controller (API driven).
+    // Sorting is done client-side for display order.
+    final sorted = List<AppointmentModel>.from(appointments)
+      ..sort((a, b) => _parseTime(a.time).compareTo(_parseTime(b.time)));
 
-    final selected = _dateOnly(_selectedDate);
-    final filteredByDate = indexedAppointments
-        .where((entry) => DateUtils.isSameDay(
-              _appointmentDateForIndex(entry.key),
-              selected,
-            ))
-        .toList();
+    final listToShow =
+        widget.showOnlyToday ? sorted.take(5).toList() : sorted;
 
-    final listToShow = widget.showOnlyToday
-        ? filteredByDate.take(5).toList()
-        : filteredByDate;
+    final emptyMessage = _searchQuery.isNotEmpty
+        ? "No patients found for '$_searchQuery'"
+        : "No appointments on selected date";
+
     return Expanded(
-      child: listToShow.isEmpty
-          ? Center(
-              child: Text("No appointments on selected date",
-                  style: TextStyle(fontFamily: 'Poppins', color: Colors.grey)))
-          : ListView.builder(
+      child: Obx(() {
+        if (_patientController.isLoading.value) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (listToShow.isEmpty) {
+          return Center(
+            child: Text(emptyMessage,
+                style: TextStyle(fontFamily: 'Poppins', color: Colors.grey)),
+          );
+        }
+        return NotificationListener<ScrollNotification>(
+              onNotification: (notification) {
+                if (notification is ScrollUpdateNotification) {
+                  final offset = notification.metrics.pixels;
+                  if (offset > 2 && _calendarExpanded) {
+                    setState(() => _calendarExpanded = false);
+                  } else if (offset <= 0 && !_calendarExpanded) {
+                    setState(() => _calendarExpanded = true);
+                  }
+                }
+                return false;
+              },
+              child: ListView.builder(
               padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
               itemCount: listToShow.length,
               itemBuilder: (context, index) {
-                final entry = listToShow[index];
-                final originalIndex = entry.key;
-                final appointment = entry.value;
+                final appointment = listToShow[index];
+                final originalIndex = appointments.indexOf(appointment);
                 final persistedStatus = _persistedStatuses[appointment.id];
                 final isPending =
                     persistedStatus != null && persistedStatus == 'Pending';
@@ -663,7 +755,7 @@ class AppointmentsPageState extends State<AppointmentsPage> {
                                       size: 14, color: Colors.white),
                                   SizedBox(width: 6),
                                   Text(
-                                    appointment.time,
+                                    _formatTimeWithDay(appointment.time),
                                     style: TextStyle(
                                         color: Colors.white,
                                         fontFamily: 'Poppins',
@@ -701,6 +793,8 @@ class AppointmentsPageState extends State<AppointmentsPage> {
                 );
               },
             ),
+          );
+        }),
     );
   }
 
@@ -828,6 +922,7 @@ class AppointmentsPageState extends State<AppointmentsPage> {
                           setState(() {
                             _selectedDate = date;
                           });
+                          _fetchAppointments();
                         },
                         child: Center(
                           child: Container(

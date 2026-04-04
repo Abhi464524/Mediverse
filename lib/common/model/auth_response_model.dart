@@ -1,6 +1,7 @@
 class AuthResponseModel {
   final bool success;
   final String message;
+  final String userId;
   final String username;
   final String phoneNumber;
   final String role;
@@ -10,6 +11,7 @@ class AuthResponseModel {
   const AuthResponseModel({
     required this.success,
     required this.message,
+    required this.userId,
     required this.username,
     required this.phoneNumber,
     required this.role,
@@ -42,6 +44,7 @@ class AuthResponseModel {
     return AuthResponseModel(
       success: success,
       message: (json["message"] ?? "").toString(),
+      userId: (json["user_id"] ?? json["userId"] ?? json["id"] ?? userMap["id"] ?? userMap["user_id"] ?? userMap["userId"] ?? userMap["_id"] ?? "").toString(),
       username: parsedUsername,
       phoneNumber: (json["phoneNumber"] ?? userMap["phoneNumber"] ?? "").toString(),
       role: (json["role"] ?? userMap["role"] ?? "").toString(),

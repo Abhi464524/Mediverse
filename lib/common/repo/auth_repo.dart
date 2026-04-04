@@ -13,10 +13,25 @@ class AuthRepo {
       data: request.toJson(),
     );
 
-    final map = response.data is Map<String, dynamic>
-        ? response.data as Map<String, dynamic>
-        : <String, dynamic>{};
-    return AuthResponseModel.fromJson(map);
+    if (response.data is Map<String, dynamic>) {
+      return AuthResponseModel.fromJson(
+        response.data as Map<String, dynamic>,
+      );
+    }
+
+    // Tunnels / proxies sometimes return HTML or plain text even when the
+    // HTTP status is 200. Surface that body to the UI.
+    final bodyText = response.data.toString();
+    return AuthResponseModel(
+      success: false,
+      message: bodyText,
+      userId: '',
+      username: '',
+      phoneNumber: request.phoneNumber,
+      role: request.role,
+      speciality: request.speciality,
+      token: '',
+    );
   }
 
   Future<AuthResponseModel> loginPhone(AuthRequestModel request) async {
@@ -25,10 +40,25 @@ class AuthRepo {
       data: request.toJson(),
     );
 
-    final map = response.data is Map<String, dynamic>
-        ? response.data as Map<String, dynamic>
-        : <String, dynamic>{};
-    return AuthResponseModel.fromJson(map);
+    if (response.data is Map<String, dynamic>) {
+      return AuthResponseModel.fromJson(
+        response.data as Map<String, dynamic>,
+      );
+    }
+
+    // Tunnels / proxies sometimes return HTML or plain text even when the
+    // HTTP status is 200. Surface that body to the UI.
+    final bodyText = response.data.toString();
+    return AuthResponseModel(
+      success: false,
+      message: bodyText,
+      userId: '',
+      username: '',
+      phoneNumber: request.phoneNumber,
+      role: request.role,
+      speciality: request.speciality,
+      token: '',
+    );
   }
 
   Future<AuthResponseModel> signUp(SignUpRequestModel request) async {
@@ -37,9 +67,22 @@ class AuthRepo {
       data: request.toJson(),
     );
 
-    final map = response.data is Map<String, dynamic>
-        ? response.data as Map<String, dynamic>
-        : <String, dynamic>{};
-    return AuthResponseModel.fromJson(map);
+    if (response.data is Map<String, dynamic>) {
+      return AuthResponseModel.fromJson(
+        response.data as Map<String, dynamic>,
+      );
+    }
+
+    final bodyText = response.data.toString();
+    return AuthResponseModel(
+      success: false,
+      message: bodyText,
+      userId: '',
+      username: request.username,
+      phoneNumber: request.phoneNumber,
+      role: request.role,
+      speciality: request.speciality,
+      token: '',
+    );
   }
 }

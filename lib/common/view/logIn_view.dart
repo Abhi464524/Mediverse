@@ -157,6 +157,7 @@ class _LogInPageState extends State<LogInPage> {
         role: role,
         phoneNumber: user.phoneNumber,
         speciality: speciality,
+        userId: user.userId,
       );
 
       if (role == "doctor") {
@@ -315,6 +316,7 @@ class _LogInPageState extends State<LogInPage> {
             ? response.phoneNumber
             : phoneDigits,
         speciality: resolvedSpeciality,
+        userId: response.userId,
       );
 
       final roleLower = (response.role.isNotEmpty ? response.role : widget.role)
