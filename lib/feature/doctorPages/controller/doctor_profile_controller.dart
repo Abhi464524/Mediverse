@@ -1,25 +1,35 @@
 import 'package:get/get.dart';
-import 'package:flutter/foundation.dart';
-import 'package:mediverse/feature/doctorPages/model/doctor_profile_update_model.dart';
+import 'package:mediverse/feature/doctorPages/model/doctor_profile_model.dart';
 import 'package:mediverse/feature/doctorPages/repo/doctor_repo.dart';
 
 class DoctorProfileController extends GetxController {
-  final DoctorRepo _repo = DoctorRepo();
-  final isSaving = false.obs;
+  final DoctorRepo _doctorRepo = DoctorRepo();
+  
+  final RxBool isSaving = false.obs;
+  final RxBool isLoading = false.obs;
+  final Rx<DoctorProfile?> doctorProfile = Rx<DoctorProfile?>(null);
 
-  Future<DoctorProfileUpdateResponse?> saveDoctorProfile(
-    DoctorProfileUpdateRequest request,
-  ) async {
+  Future<DoctorProfile?> fetchDoctorProfile(int doctorId) async {
+    isLoading.value = true;
     try {
-      isSaving.value = true;
-      final response = await _repo.saveDoctorProfile(request);
-      return response;
-    } catch (e) {
-      debugPrint('DoctorProfileController.saveDoctorProfile error: $e');
-      return null;
+      final profile = await _doctorRepo.fetchDoctorProfile(doctorId);
+      doctorProfile.value = profile;
+      return profile;
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  Future<DoctorProfile?> saveDoctorProfile(DoctorProfile profile) async {
+    isSaving.value = true;
+    try {
+      final savedProfile = await _doctorRepo.saveDoctorProfile(profile);
+      if (savedProfile != null) {
+        doctorProfile.value = savedProfile;
+      }
+      return savedProfile;
     } finally {
       isSaving.value = false;
     }
   }
-
 }

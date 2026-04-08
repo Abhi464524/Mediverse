@@ -1,7 +1,7 @@
 class ApiConfig {
   static const String _fromEnv = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://192.168.1.10:3500',
+    defaultValue: 'http://10.10.81.218:3500',
   );
 
   static String get baseUrl => _normalizeBase(_fromEnv);
@@ -9,7 +9,7 @@ class ApiConfig {
   static String _normalizeBase(String raw) {
     var s = raw.trim();
     if (s.isEmpty) {
-      return 'http://192.168.1.10:3500';
+      return 'http://10.10.81.218:3500';
     }
     while (s.endsWith('/')) {
       s = s.substring(0, s.length - 1);

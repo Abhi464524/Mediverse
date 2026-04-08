@@ -4,9 +4,8 @@ import 'package:mediverse/common/services/dio/api_service.dart';
 import 'package:mediverse/common/services/storage_service.dart';
 import 'package:mediverse/endPoints.dart';
 import 'package:mediverse/feature/doctorPages/model/emergency_appointment_model.dart';
-import 'package:mediverse/feature/doctorPages/model/doctor_profile_fetch_model.dart';
-import 'package:mediverse/feature/doctorPages/model/doctor_profile_update_model.dart';
 import 'package:mediverse/feature/doctorPages/model/appointment_model.dart';
+import 'package:mediverse/feature/doctorPages/model/doctor_profile_model.dart';
 import 'package:mediverse/feature/doctorPages/model/patient_model.dart';
 
 class DoctorRepo {
@@ -30,54 +29,6 @@ class DoctorRepo {
     }
   }
 
-  Future<DoctorProfileUpdateResponse> saveDoctorProfile(
-    DoctorProfileUpdateRequest request,
-  ) async {
-    final response = await _dioClient.post(
-      EndPoints.doctorProfileURL,
-      data: request.toJson(),
-    );
-    final map = response.data is Map<String, dynamic>
-        ? response.data as Map<String, dynamic>
-        : <String, dynamic>{};
-    return DoctorProfileUpdateResponse.fromJson(map);
-  }
-
-  Future<DoctorProfileFetchResponse?> fetchDoctorProfile(
-    int doctorId, {
-    DoctorProfileUpdateRequest? fallbackRequest,
-  }) async {
-    final path = EndPoints.doctorProfileURL;
-    try {
-      final response = await _dioClient.get(
-        path,
-        queryParameters: {"doctorId": doctorId},
-      );
-      final map = _responseToMap(response.data);
-      return DoctorProfileFetchResponse.fromJson(map);
-    } catch (getError) {
-      debugPrint('fetchDoctorProfile GET failed: $getError');
-      if (fallbackRequest == null) {
-        // Do not POST with only doctorId on page open.
-        return null;
-      }
-      try {
-        // Some backends expose fetch on POST. If so, send full payload
-        // to avoid overwriting existing fields with nulls.
-        final postData = fallbackRequest.toJson();
-        final response = await _dioClient.post(
-          path,
-          data: postData,
-        );
-        final map = _responseToMap(response.data);
-        return DoctorProfileFetchResponse.fromJson(map);
-      } catch (postError) {
-        debugPrint('fetchDoctorProfile POST fallback failed: $postError');
-        return null;
-      }
-    }
-  }
-
   Map<String, dynamic> _responseToMap(dynamic data) {
     if (data is Map<String, dynamic>) return data;
     if (data is List && data.isNotEmpty && data.first is Map<String, dynamic>) {
@@ -86,15 +37,13 @@ class DoctorRepo {
     return <String, dynamic>{};
   }
 
-  /// Fetches appointments with optional date and search filters.
-  /// [date] — "yyyy-MM-dd" format. [search] — patient name or phone.
   Future<List<AppointmentModel>> fetchAppointments({
     String? date,
     String? search,
   }) async {
     final doctorId = await _getDoctorId();
     final queryParams = <String, dynamic>{};
-    if (doctorId.isNotEmpty) queryParams['doctor_id'] = doctorId;
+    if (doctorId.isNotEmpty) queryParams['doctorId'] = doctorId;
     if (date != null && date.isNotEmpty) queryParams['date'] = date;
     if (search != null && search.isNotEmpty) queryParams['search'] = search;
 
@@ -122,7 +71,7 @@ class DoctorRepo {
   Future<List<EmergencyAppointmentModel>> fetchEmergencyAppointments() async {
     final doctorId = await _getDoctorId();
     final queryParams = <String, dynamic>{};
-    if (doctorId.isNotEmpty) queryParams['doctor_id'] = doctorId;
+    if (doctorId.isNotEmpty) queryParams['doctorId'] = doctorId;
     final response = await _dioClient.get(
       EndPoints.emergencyAppointmentsURL,
       queryParameters: queryParams,
@@ -147,5 +96,36 @@ class DoctorRepo {
     }
 
     return const <EmergencyAppointmentModel>[];
+  }
+
+  Future<DoctorProfile?> fetchDoctorProfile(int doctorId) async {
+    try {
+      final response = await _dioClient.get(
+        "${EndPoints.doctorProfileURL}/$doctorId",
+      );
+      if (response.data != null) {
+        return DoctorProfile.fromJson(response.data);
+      }
+      return null;
+    } catch (e) {
+      if (kDebugMode) print("Error fetching doctor profile: $e");
+      return null;
+    }
+  }
+
+  Future<DoctorProfile?> saveDoctorProfile(DoctorProfile profile) async {
+    try {
+      final response = await _dioClient.post(
+        EndPoints.doctorProfileURL,
+        data: profile.toJson(),
+      );
+      if (response.data != null) {
+        return DoctorProfile.fromJson(response.data);
+      }
+      return null;
+    } catch (e) {
+      if (kDebugMode) print("Error saving doctor profile: $e");
+      return null;
+    }
   }
 }

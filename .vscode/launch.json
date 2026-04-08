@@ -2,12 +2,12 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Mediverse · localtunnel (dart-define)",
+      "name": "Mediverse · LAN (10.10.81.218)",
       "request": "launch",
       "type": "dart",
       "program": "lib/main.dart",
       "toolArgs": [
-        "--dart-define=API_BASE_URL=https://mediverse-api-rathi.loca.lt/api"
+        "--dart-define=API_BASE_URL=http://10.10.81.218:3500/api"
       ]
     },
     {

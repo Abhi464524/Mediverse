@@ -1,13 +1,12 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import 'package:get/get.dart';
 import 'package:mediverse/common/services/storage_service.dart';
-import 'package:mediverse/feature/doctorPages/controller/doctor_profile_fetch_controller.dart';
 import 'package:mediverse/feature/doctorPages/controller/doctor_profile_controller.dart';
-import 'package:mediverse/feature/doctorPages/model/doctor_profile_fetch_model.dart';
-import 'package:mediverse/feature/doctorPages/model/doctor_profile_update_model.dart';
+import 'package:mediverse/feature/doctorPages/model/doctor_profile_model.dart';
 
 class EditDoctorProfileView extends StatefulWidget {
   final String currentName;
@@ -26,7 +25,7 @@ class EditDoctorProfileView extends StatefulWidget {
 }
 
 class _EditDoctorProfileViewState extends State<EditDoctorProfileView> {
-  static const int _doctorId = 5;
+  int? _currentDoctorId;
 
   late TextEditingController _nameController;
   late TextEditingController _specializationController;
@@ -35,20 +34,15 @@ class _EditDoctorProfileViewState extends State<EditDoctorProfileView> {
   String? _currentUsername;
 
   // New fields
-  final TextEditingController _experienceController =
-      TextEditingController(text: "8 Years");
-  final TextEditingController _phoneController =
-      TextEditingController(text: "+1 234-567-8900");
-  final TextEditingController _emailController =
-      TextEditingController(text: "doctor@clinic.com");
+  final TextEditingController _experienceController = TextEditingController();
+  final TextEditingController _phoneController = TextEditingController();
+  final TextEditingController _emailController = TextEditingController();
   final TextEditingController _clinicAddressController =
-      TextEditingController(text: "123 Health Avenue, Medical District");
+      TextEditingController();
   final TextEditingController _consultationFeeController =
-      TextEditingController(text: "500");
+      TextEditingController();
   final DoctorProfileController _doctorProfileController =
       Get.put(DoctorProfileController());
-  final DoctorProfileFetchController _doctorProfileFetchController =
-      Get.put(DoctorProfileFetchController());
 
   @override
   void initState() {
@@ -56,9 +50,40 @@ class _EditDoctorProfileViewState extends State<EditDoctorProfileView> {
     _nameController = TextEditingController(text: widget.currentName);
     _specializationController =
         TextEditingController(text: widget.currentSpecialization);
-    _loadCachedDoctorProfile();
+    _loadDoctorIdAndData();
     _loadSessionProfileDetails();
     _loadSavedProfileImage();
+  }
+
+  Future<void> _loadDoctorIdAndData() async {
+    try {
+      final storage = await StorageService.getInstance();
+      final profile = await storage.getCurrentUserProfile();
+      final rawId = profile?['userId'] ?? profile?['id'];
+      if (rawId != null) {
+        setState(() {
+          _currentDoctorId = int.tryParse(rawId.toString());
+        });
+        if (_currentDoctorId != null) {
+          _loadCachedDoctorProfile();
+          // Also fetch fresh from API
+          _fetchFreshProfile();
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) print("Error loading doctor ID: $e");
+    }
+  }
+
+  Future<void> _fetchFreshProfile() async {
+    if (_currentDoctorId == null) return;
+    final profile =
+        await _doctorProfileController.fetchDoctorProfile(_currentDoctorId!);
+    if (profile != null && mounted) {
+      setState(() {
+        _applyProfileData(profile);
+      });
+    }
   }
 
   Future<void> _loadSessionProfileDetails() async {
@@ -94,117 +119,94 @@ class _EditDoctorProfileViewState extends State<EditDoctorProfileView> {
     return int.tryParse(digits) ?? fallback;
   }
 
-  void _applySavedProfileFromResponse(DoctorProfileUpdateResponse data) {
-    _experienceController.text = data.experienceYears.toString();
-    _emailController.text = data.email;
-    _clinicAddressController.text = data.clinicAddress;
-    _consultationFeeController.text = data.consultationFee.toString();
-  }
-
-  void _applyFetchedProfileFromResponse(DoctorProfileFetchResponse data) {
-    _experienceController.text = data.experienceYears.toString();
-    _emailController.text = data.email;
-    _clinicAddressController.text = data.clinicAddress;
-    _consultationFeeController.text = data.consultationFee.toString();
+  void _applyProfileData(DoctorProfile profile) {
+    _nameController.text =
+        profile.personalInfo?.fullName ?? _nameController.text;
+    _specializationController.text =
+        profile.personalInfo?.specialization ?? _specializationController.text;
+    _experienceController.text =
+        profile.personalInfo?.experienceYears?.toString() ??
+            _experienceController.text;
+    _phoneController.text =
+        profile.contactDetails?.phoneNumber ?? _phoneController.text;
+    _emailController.text =
+        profile.contactDetails?.email ?? _emailController.text;
+    _clinicAddressController.text =
+        profile.clinicDetails?.clinicAddress ?? _clinicAddressController.text;
+    _consultationFeeController.text =
+        profile.clinicDetails?.consultationFee?.toString() ??
+            _consultationFeeController.text;
   }
 
   Future<void> _loadCachedDoctorProfile() async {
     try {
+      if (_currentDoctorId == null) return;
       final storage = await StorageService.getInstance();
-      final raw = storage.getString(_doctorProfileCacheKey(_doctorId));
+      final raw = storage.getString(_doctorProfileCacheKey(_currentDoctorId!));
       if (raw == null || raw.isEmpty) return;
       final decoded = jsonDecode(raw);
       if (decoded is! Map<String, dynamic>) return;
       if (!mounted) return;
       setState(() {
         _experienceController.text =
-            (decoded['experienceYears'] ?? _experienceController.text).toString();
-        _emailController.text = (decoded['email'] ?? _emailController.text).toString();
+            (decoded['experienceYears'] ?? _experienceController.text)
+                .toString();
+        _emailController.text =
+            (decoded['email'] ?? _emailController.text).toString();
         _clinicAddressController.text =
-            (decoded['clinicAddress'] ?? _clinicAddressController.text).toString();
+            (decoded['clinicAddress'] ?? _clinicAddressController.text)
+                .toString();
         _consultationFeeController.text =
-            (decoded['consultationFee'] ?? _consultationFeeController.text).toString();
+            (decoded['consultationFee'] ?? _consultationFeeController.text)
+                .toString();
       });
     } catch (_) {
       // Ignore cache parse/read failures.
     }
   }
 
-  Future<void> _cacheDoctorProfile({
-    required int experienceYears,
-    required String email,
-    required String clinicAddress,
-    required int consultationFee,
-  }) async {
-    try {
-      final storage = await StorageService.getInstance();
-      final payload = jsonEncode({
-        "doctorId": _doctorId,
-        "experienceYears": experienceYears,
-        "email": email,
-        "clinicAddress": clinicAddress,
-        "consultationFee": consultationFee,
-      });
-      await storage.setString(_doctorProfileCacheKey(_doctorId), payload);
-    } catch (_) {
-      // Ignore cache write failures.
-    }
-  }
-
-  String _doctorProfileCacheKey(int doctorId) => 'doctor_profile_cache_$doctorId';
+  String _doctorProfileCacheKey(int doctorId) =>
+      'doctor_profile_cache_$doctorId';
 
   Future<void> _saveDoctorProfile() async {
     if (_doctorProfileController.isSaving.value) return;
+    if (_currentDoctorId == null) return;
+
     try {
-      final request = DoctorProfileUpdateRequest(
-        doctorId: _doctorId,
-        experienceYears: _extractInt(_experienceController.text, fallback: 8),
-        email: _emailController.text.trim(),
-        clinicAddress: _clinicAddressController.text.trim(),
-        consultationFee: _extractInt(_consultationFeeController.text, fallback: 500),
+      final profile = DoctorProfile(
+        doctorId: _currentDoctorId,
+        personalInfo: PersonalInfo(
+          fullName: _nameController.text.trim(),
+          specialization: _specializationController.text.trim(),
+          experienceYears: _extractInt(_experienceController.text, fallback: 0),
+        ),
+        contactDetails: ContactDetails(
+          phoneNumber: _phoneController.text.trim(),
+          email: _emailController.text.trim(),
+        ),
+        clinicDetails: ClinicDetails(
+          clinicAddress: _clinicAddressController.text.trim(),
+          consultationFee:
+              _extractInt(_consultationFeeController.text, fallback: 0),
+        ),
       );
 
-      final saved = await _doctorProfileController.saveDoctorProfile(request);
-      if (saved == null) {
-        throw Exception('Unable to save profile');
-      }
-      _applySavedProfileFromResponse(saved);
-
-      // Fetch latest persisted values from same API and show those on screen.
-      final fetched = await _doctorProfileFetchController.fetchDoctorProfile(
-        const DoctorProfileFetchRequest(doctorId: _doctorId),
-        fallbackRequest: request,
-      );
-      if (fetched != null) {
-        _applyFetchedProfileFromResponse(fetched);
-        await _cacheDoctorProfile(
-          experienceYears: fetched.experienceYears,
-          email: fetched.email,
-          clinicAddress: fetched.clinicAddress,
-          consultationFee: fetched.consultationFee,
-        );
-      } else if (mounted) {
-        await _cacheDoctorProfile(
-          experienceYears: saved.experienceYears,
-          email: saved.email,
-          clinicAddress: saved.clinicAddress,
-          consultationFee: saved.consultationFee,
-        );
+      final saved = await _doctorProfileController.saveDoctorProfile(profile);
+      if (saved != null) {
+        _applyProfileData(saved);
+        
+        // Cache locally
+        final storage = await StorageService.getInstance();
+        await storage.setString(_doctorProfileCacheKey(_currentDoctorId!),
+            jsonEncode(saved.toJson()));
+        
+        widget.onSave(_nameController.text, _specializationController.text);
+        
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Saved, but latest profile could not be fetched.'),
-          ),
+          const SnackBar(content: Text('Profile saved successfully')),
         );
       }
-
-      widget.onSave(_nameController.text, _specializationController.text);
-
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Profile saved successfully')),
-      );
-      setState(() {});
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -328,8 +330,8 @@ class _EditDoctorProfileViewState extends State<EditDoctorProfileView> {
                         padding: const EdgeInsets.all(4),
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          border:
-                              Border.all(color: const Color(0xFFC4DAD2), width: 3),
+                          border: Border.all(
+                              color: const Color(0xFFC4DAD2), width: 3),
                         ),
                         child: CircleAvatar(
                           radius: 50,
@@ -383,27 +385,34 @@ class _EditDoctorProfileViewState extends State<EditDoctorProfileView> {
                         _buildTextField(
                             "Full Name", _nameController, Icons.person_outline),
                         const SizedBox(height: 15),
-                        _buildTextField("Specialization", _specializationController,
+                        _buildTextField(
+                            "Specialization",
+                            _specializationController,
                             Icons.medical_services_outlined),
                         const SizedBox(height: 15),
-                        _buildTextField("Years of Experience", _experienceController,
-                            Icons.work_history_outlined,
-                            keyboardType: TextInputType.number),
+                        _buildTextField("Years of Experience",
+                            _experienceController, Icons.work_history_outlined,
+                            hint: "e.g. 5", keyboardType: TextInputType.number),
                         const SizedBox(height: 25),
                         _buildSectionTitle("Contact Details"),
                         const SizedBox(height: 15),
-                        _buildTextField(
-                            "Phone Number", _phoneController, Icons.phone_outlined,
+                        _buildTextField("Phone Number", _phoneController,
+                            Icons.phone_outlined,
+                            hint: "e.g. +91 9876543210",
                             keyboardType: TextInputType.phone),
                         const SizedBox(height: 15),
-                        _buildTextField(
-                            "Email Address", _emailController, Icons.email_outlined,
+                        _buildTextField("Email Address", _emailController,
+                            Icons.email_outlined,
+                            hint: "e.g. doctor@clinic.com",
                             keyboardType: TextInputType.emailAddress),
                         const SizedBox(height: 25),
                         _buildSectionTitle("Clinic Details"),
                         const SizedBox(height: 15),
-                        _buildTextField("Clinic Address", _clinicAddressController,
+                        _buildTextField(
+                            "Clinic Address",
+                            _clinicAddressController,
                             Icons.location_on_outlined,
+                            hint: "Enter clinic full address",
                             minLines: 1,
                             autoGrow: true),
                         const SizedBox(height: 15),
@@ -411,6 +420,7 @@ class _EditDoctorProfileViewState extends State<EditDoctorProfileView> {
                             "Consultation Fee (₹)",
                             _consultationFeeController,
                             Icons.currency_rupee_outlined,
+                            hint: "e.g. 500",
                             keyboardType: TextInputType.number),
                         const SizedBox(height: 24),
                       ],
@@ -427,8 +437,9 @@ class _EditDoctorProfileViewState extends State<EditDoctorProfileView> {
                 width: double.infinity,
                 height: 55,
                 child: ElevatedButton(
-                  onPressed:
-                      _doctorProfileController.isSaving.value ? null : _saveDoctorProfile,
+                  onPressed: _doctorProfileController.isSaving.value
+                      ? null
+                      : _saveDoctorProfile,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF6A9C89),
                     shape: RoundedRectangleBorder(
@@ -475,7 +486,8 @@ class _EditDoctorProfileViewState extends State<EditDoctorProfileView> {
 
   Widget _buildTextField(
       String label, TextEditingController controller, IconData icon,
-      {int maxLines = 1,
+      {String? hint,
+      int maxLines = 1,
       int? minLines,
       bool autoGrow = false,
       TextInputType keyboardType = TextInputType.text}) {
@@ -483,10 +495,10 @@ class _EditDoctorProfileViewState extends State<EditDoctorProfileView> {
       controller: controller,
       maxLines: autoGrow ? null : maxLines,
       minLines: autoGrow ? (minLines ?? 1) : minLines,
-      keyboardType:
-          autoGrow ? TextInputType.multiline : keyboardType,
+      keyboardType: autoGrow ? TextInputType.multiline : keyboardType,
       decoration: InputDecoration(
         labelText: label,
+        hintText: hint,
         prefixIcon: Icon(icon, color: const Color(0xFF6A9C89)),
         alignLabelWithHint: autoGrow || maxLines > 1,
         border: OutlineInputBorder(
