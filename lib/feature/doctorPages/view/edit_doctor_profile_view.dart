@@ -147,21 +147,13 @@ class _EditDoctorProfileViewState extends State<EditDoctorProfileView> {
       final decoded = jsonDecode(raw);
       if (decoded is! Map<String, dynamic>) return;
       if (!mounted) return;
+
+      final profile = DoctorProfile.fromJson(decoded);
       setState(() {
-        _experienceController.text =
-            (decoded['experienceYears'] ?? _experienceController.text)
-                .toString();
-        _emailController.text =
-            (decoded['email'] ?? _emailController.text).toString();
-        _clinicAddressController.text =
-            (decoded['clinicAddress'] ?? _clinicAddressController.text)
-                .toString();
-        _consultationFeeController.text =
-            (decoded['consultationFee'] ?? _consultationFeeController.text)
-                .toString();
+        _applyProfileData(profile);
       });
-    } catch (_) {
-      // Ignore cache parse/read failures.
+    } catch (e) {
+      if (kDebugMode) print("Error loading cached doctor profile: $e");
     }
   }
 

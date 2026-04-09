@@ -30,10 +30,15 @@ class _EmergencyAppointmentsPageState extends State<EmergencyAppointmentsPage> {
 
   static const String _hardcodedPhoneNumber = "+91 7900464524";
 
-  DateTime _selectedDate = DateTime.now();
+  // Date parameters are now managed in _controller
+  DateTime get _selectedDate => _controller.selectedDate.value;
+  set _selectedDate(DateTime d) => _controller.selectedDate.value = d;
+  
+  String get _searchQuery => _controller.searchQuery.value;
+  set _searchQuery(String s) => _controller.searchQuery.value = s;
+
   late final PageController _weekPageController;
   final TextEditingController _searchController = TextEditingController();
-  String _searchQuery = '';
   bool _calendarExpanded = true;
   final Map<String, String> _persistedStatuses = {};
 
@@ -118,12 +123,14 @@ class _EmergencyAppointmentsPageState extends State<EmergencyAppointmentsPage> {
     return 'Scheduled';
   }
 
-  List<EmergencyAppointmentModel> get _filteredAppointments {
-    final all = _controller.appointments.toList();
-    if (_searchQuery.isEmpty) return all;
-    return all
-        .where((a) => a.patientName.toLowerCase().contains(_searchQuery))
-        .toList();
+  String _formatDateParam(DateTime d) =>
+      '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+
+  Future<void> _fetchEmergencyAppointments() async {
+    await _controller.loadEmergencyAppointments(
+      date: _searchQuery.isEmpty ? _formatDateParam(_selectedDate) : null,
+      search: _searchQuery.isNotEmpty ? _searchQuery : null,
+    );
   }
 
   Future<void> _callHardcodedNumber() async {
@@ -149,12 +156,17 @@ class _EmergencyAppointmentsPageState extends State<EmergencyAppointmentsPage> {
   @override
   void initState() {
     super.initState();
-    _selectedDate = _dateOnly(DateTime.now());
+    // Initialize controller state if not set
+    _controller.selectedDate.value = _dateOnly(DateTime.now());
     _weekPageController =
         PageController(initialPage: _selectedWeekIndexForMonth(_selectedDate));
-    _controller.loadEmergencyAppointments().then((_) => _loadPersistedStatuses());
-    WidgetsBinding.instance
-        .addPostFrameCallback((_) => _jumpToSelectedWeek(animate: false));
+    
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _fetchEmergencyAppointments().then((_) => _loadPersistedStatuses());
+        _jumpToSelectedWeek(animate: false);
+      }
+    });
   }
 
   @override
@@ -194,7 +206,7 @@ class _EmergencyAppointmentsPageState extends State<EmergencyAppointmentsPage> {
             ),
             child: IconButton(
               icon: const Icon(Icons.refresh, color: _kAccent),
-              onPressed: () => _controller.loadEmergencyAppointments(),
+              onPressed: () => _fetchEmergencyAppointments(),
               tooltip: 'Refresh',
             ),
           ),
@@ -269,7 +281,10 @@ class _EmergencyAppointmentsPageState extends State<EmergencyAppointmentsPage> {
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: TextField(
         controller: _searchController,
-        onChanged: (v) => setState(() => _searchQuery = v.trim().toLowerCase()),
+        onChanged: (v) {
+          setState(() => _searchQuery = v.trim().toLowerCase());
+          _fetchEmergencyAppointments();
+        },
         decoration: InputDecoration(
           hintText: 'Search by patient name...',
           hintStyle: TextStyle(
@@ -281,6 +296,7 @@ class _EmergencyAppointmentsPageState extends State<EmergencyAppointmentsPage> {
                   onPressed: () {
                     _searchController.clear();
                     setState(() => _searchQuery = '');
+                    _fetchEmergencyAppointments();
                   },
                 )
               : null,
@@ -331,7 +347,7 @@ class _EmergencyAppointmentsPageState extends State<EmergencyAppointmentsPage> {
           );
         }
 
-        final listToShow = _filteredAppointments
+        final listToShow = List<EmergencyAppointmentModel>.from(_controller.appointments)
           ..sort((a, b) => _parseTime(a.time).compareTo(_parseTime(b.time)));
 
         if (listToShow.isEmpty) {
@@ -360,7 +376,7 @@ class _EmergencyAppointmentsPageState extends State<EmergencyAppointmentsPage> {
           },
           child: RefreshIndicator(
             color: _kAccent,
-            onRefresh: _controller.loadEmergencyAppointments,
+            onRefresh: _fetchEmergencyAppointments,
             child: ListView.builder(
               padding:
                   const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
@@ -650,6 +666,7 @@ class _EmergencyAppointmentsPageState extends State<EmergencyAppointmentsPage> {
                     _selectedDate = DateTime(
                         _selectedDate.year, _selectedDate.month - 1, 1);
                   });
+                  _fetchEmergencyAppointments();
                   WidgetsBinding.instance
                       .addPostFrameCallback((_) => _jumpToSelectedWeek());
                 },
@@ -677,6 +694,7 @@ class _EmergencyAppointmentsPageState extends State<EmergencyAppointmentsPage> {
                     _selectedDate = DateTime(
                         _selectedDate.year, _selectedDate.month + 1, 1);
                   });
+                  _fetchEmergencyAppointments();
                   WidgetsBinding.instance
                       .addPostFrameCallback((_) => _jumpToSelectedWeek());
                 },
@@ -725,7 +743,11 @@ class _EmergencyAppointmentsPageState extends State<EmergencyAppointmentsPage> {
                     return Expanded(
                       child: InkWell(
                         borderRadius: BorderRadius.circular(12),
-                        onTap: () => setState(() => _selectedDate = date),
+                        onTap: () {
+                          _selectedDate = date;
+                          _fetchEmergencyAppointments();
+                          setState(() {});
+                        },
                         child: Center(
                           child: Container(
                             width: 30,

@@ -9,11 +9,24 @@ class EmergencyAppointmentsController extends GetxController {
   final error = ''.obs;
   final appointments = <EmergencyAppointmentModel>[].obs;
 
-  Future<void> loadEmergencyAppointments() async {
+  final selectedDate = DateTime.now().obs;
+  final searchQuery = ''.obs;
+
+  String _formatDate(DateTime d) =>
+      '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+
+  Future<void> loadEmergencyAppointments({String? date, String? search}) async {
     try {
       isLoading.value = true;
       error.value = '';
-      final result = await _doctorRepo.fetchEmergencyAppointments();
+
+      final effectiveDate = date ?? (searchQuery.value.isEmpty ? _formatDate(selectedDate.value) : null);
+      final effectiveSearch = search ?? (searchQuery.value.isNotEmpty ? searchQuery.value : null);
+
+      final result = await _doctorRepo.fetchEmergencyAppointments(
+        date: effectiveDate,
+        search: effectiveSearch,
+      );
       appointments.assignAll(result);
     } catch (e) {
       error.value = e.toString();

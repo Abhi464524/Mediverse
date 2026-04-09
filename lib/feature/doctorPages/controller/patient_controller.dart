@@ -10,17 +10,25 @@ class PatientController extends GetxController {
   var appointments = <AppointmentModel>[].obs;
   var error = ''.obs;
 
+  final selectedDate = DateTime.now().obs;
+  final searchQuery = ''.obs;
+
+  String _formatDate(DateTime d) =>
+      '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+
   /// Fetch appointments from backend.
-  /// Pass [date] as "yyyy-MM-dd" to filter by date.
-  /// Pass [search] to filter by patient name or phone.
-  /// When [search] is provided, [date] is ignored (search across all dates).
+  /// Pass [date] or [search] override if needed, otherwise uses controller state.
   Future<void> fetchAppointments({String? date, String? search}) async {
     try {
       isLoading.value = true;
       error.value = '';
+
+      final effectiveDate = date ?? (searchQuery.value.isEmpty ? _formatDate(selectedDate.value) : null);
+      final effectiveSearch = search ?? (searchQuery.value.isNotEmpty ? searchQuery.value : null);
+
       final result = await _doctorRepo.fetchAppointments(
-        date: date,
-        search: search,
+        date: effectiveDate,
+        search: effectiveSearch,
       );
       appointments.value = result;
     } catch (e) {

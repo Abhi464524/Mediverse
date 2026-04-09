@@ -36,20 +36,19 @@ class AppointmentsPageState extends State<AppointmentsPage> {
     '04:15 PM',
     '06:00 PM',
   ];
-  DateTime _selectedDate = DateTime.now();
+  // Date parameters are now managed in _patientController
+  DateTime get _selectedDate => _patientController.selectedDate.value;
+  set _selectedDate(DateTime d) => _patientController.selectedDate.value = d;
+  
+  String get _searchQuery => _patientController.searchQuery.value;
+  set _searchQuery(String s) => _patientController.searchQuery.value = s;
+
   final TextEditingController _searchController = TextEditingController();
-  String _searchQuery = '';
   bool _calendarExpanded = true;
 
-  String _formatDateParam(DateTime d) =>
-      '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
-
-  /// Calls the API via controller. Search ignores date filter.
+  /// Calls the API via controller.
   Future<void> _fetchAppointments() async {
-    await _patientController.fetchAppointments(
-      date: _searchQuery.isEmpty ? _formatDateParam(_selectedDate) : null,
-      search: _searchQuery.isNotEmpty ? _searchQuery : null,
-    );
+    await _patientController.fetchAppointments();
   }
 
   List<AppointmentModel> get appointments => _patientController.appointments;
@@ -120,14 +119,18 @@ class AppointmentsPageState extends State<AppointmentsPage> {
   @override
   void initState() {
     super.initState();
-    _selectedDate = _dateOnly(DateTime.now());
+    // Initialize controller state if not set
+    _patientController.selectedDate.value = _dateOnly(DateTime.now());
     _weekPageController =
         PageController(initialPage: _selectedWeekIndexForMonth(_selectedDate));
+    
     _fetchAppointments();
     _loadPersistedStatuses();
+    
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _jumpToSelectedWeek(animate: false);
     });
+    
     if (widget.showAddPatient) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _addPatients();
@@ -139,6 +142,7 @@ class AppointmentsPageState extends State<AppointmentsPage> {
   void dispose() {
     _weekPageController.dispose();
     _searchController.dispose();
+    // We don't reset controller state here so it persists if we come back
     super.dispose();
   }
 
@@ -504,8 +508,9 @@ class AppointmentsPageState extends State<AppointmentsPage> {
       child: TextField(
         controller: _searchController,
         onChanged: (value) {
-          setState(() => _searchQuery = value.trim().toLowerCase());
+          _searchQuery = value.trim().toLowerCase();
           _fetchAppointments();
+          setState(() {}); // Update local UI like clear icon
         },
         decoration: InputDecoration(
           hintText: 'Search by name or phone...',
@@ -520,8 +525,9 @@ class AppointmentsPageState extends State<AppointmentsPage> {
                   icon: Icon(Icons.clear, color: Colors.grey.shade400, size: 20),
                   onPressed: () {
                     _searchController.clear();
-                    setState(() => _searchQuery = '');
+                    _searchQuery = '';
                     _fetchAppointments();
+                    setState(() {});
                   },
                 )
               : null,
@@ -824,16 +830,12 @@ class AppointmentsPageState extends State<AppointmentsPage> {
                 borderRadius: BorderRadius.circular(20),
                 onTap: () {
                   setState(() {
-                    final prevMonth = DateTime(
-                      _selectedDate.year,
-                      _selectedDate.month - 1,
-                      1,
-                    );
-                    _selectedDate = prevMonth;
+                    _selectedDate = DateTime(
+                        _selectedDate.year, _selectedDate.month - 1, 1);
                   });
-                  WidgetsBinding.instance.addPostFrameCallback((_) {
-                    _jumpToSelectedWeek();
-                  });
+                  _fetchAppointments();
+                  WidgetsBinding.instance
+                      .addPostFrameCallback((_) => _jumpToSelectedWeek());
                 },
                 child: const Padding(
                   padding: EdgeInsets.all(4),
@@ -859,16 +861,12 @@ class AppointmentsPageState extends State<AppointmentsPage> {
                 borderRadius: BorderRadius.circular(20),
                 onTap: () {
                   setState(() {
-                    final nextMonth = DateTime(
-                      _selectedDate.year,
-                      _selectedDate.month + 1,
-                      1,
-                    );
-                    _selectedDate = nextMonth;
+                    _selectedDate = DateTime(
+                        _selectedDate.year, _selectedDate.month + 1, 1);
                   });
-                  WidgetsBinding.instance.addPostFrameCallback((_) {
-                    _jumpToSelectedWeek();
-                  });
+                  _fetchAppointments();
+                  WidgetsBinding.instance
+                      .addPostFrameCallback((_) => _jumpToSelectedWeek());
                 },
                 child: const Padding(
                   padding: EdgeInsets.all(4),
@@ -914,15 +912,14 @@ class AppointmentsPageState extends State<AppointmentsPage> {
                       _selectedDate.month,
                       dayNumber,
                     );
-                    final isSelected = DateUtils.isSameDay(date, _selectedDate);
+                    final isSelected = DateUtils.isSameDay(date, _patientController.selectedDate.value);
                     return Expanded(
                       child: InkWell(
                         borderRadius: BorderRadius.circular(12),
                         onTap: () {
-                          setState(() {
-                            _selectedDate = date;
-                          });
+                          _patientController.selectedDate.value = date;
                           _fetchAppointments();
+                          setState(() {});
                         },
                         child: Center(
                           child: Container(

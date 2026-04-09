@@ -4,11 +4,12 @@ class DoctorProfile {
   ContactDetails? contactDetails;
   ClinicDetails? clinicDetails;
 
-  DoctorProfile(
-      {this.doctorId,
-      this.personalInfo,
-      this.contactDetails,
-      this.clinicDetails});
+  DoctorProfile({
+    this.doctorId,
+    this.personalInfo,
+    this.contactDetails,
+    this.clinicDetails,
+  });
 
   DoctorProfile.fromJson(Map<String, dynamic> json) {
     doctorId = json['doctorId'];
@@ -37,6 +38,20 @@ class DoctorProfile {
     }
     return data;
   }
+
+  DoctorProfile copyWith({
+    int? doctorId,
+    PersonalInfo? personalInfo,
+    ContactDetails? contactDetails,
+    ClinicDetails? clinicDetails,
+  }) {
+    return DoctorProfile(
+      doctorId: doctorId ?? this.doctorId,
+      personalInfo: personalInfo ?? this.personalInfo,
+      contactDetails: contactDetails ?? this.contactDetails,
+      clinicDetails: clinicDetails ?? this.clinicDetails,
+    );
+  }
 }
 
 class PersonalInfo {
@@ -59,6 +74,18 @@ class PersonalInfo {
     data['experienceYears'] = experienceYears;
     return data;
   }
+
+  PersonalInfo copyWith({
+    String? fullName,
+    String? specialization,
+    int? experienceYears,
+  }) {
+    return PersonalInfo(
+      fullName: fullName ?? this.fullName,
+      specialization: specialization ?? this.specialization,
+      experienceYears: experienceYears ?? this.experienceYears,
+    );
+  }
 }
 
 class ContactDetails {
@@ -77,6 +104,16 @@ class ContactDetails {
     data['phoneNumber'] = phoneNumber;
     data['email'] = email;
     return data;
+  }
+
+  ContactDetails copyWith({
+    String? phoneNumber,
+    String? email,
+  }) {
+    return ContactDetails(
+      phoneNumber: phoneNumber ?? this.phoneNumber,
+      email: email ?? this.email,
+    );
   }
 }
 
@@ -97,4 +134,15 @@ class ClinicDetails {
     data['consultationFee'] = consultationFee;
     return data;
   }
+
+  ClinicDetails copyWith({
+    String? clinicAddress,
+    int? consultationFee,
+  }) {
+    return ClinicDetails(
+      clinicAddress: clinicAddress ?? this.clinicAddress,
+      consultationFee: consultationFee ?? this.consultationFee,
+    );
+  }
 }
+
