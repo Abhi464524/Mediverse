@@ -2,6 +2,7 @@ class EmergencyAppointmentModel {
   final String id;
   final String patientName;
   final String time;
+  final String date;
   final String diagnosis;
   final String severity;
   final String status;
@@ -10,6 +11,7 @@ class EmergencyAppointmentModel {
     required this.id,
     required this.patientName,
     required this.time,
+    this.date = '',
     required this.diagnosis,
     required this.severity,
     required this.status,
@@ -20,6 +22,7 @@ class EmergencyAppointmentModel {
       id: (json['id'] ?? json['_id'] ?? '').toString(),
       patientName: (json['patientName'] ?? json['name'] ?? 'Unknown').toString(),
       time: (json['time'] ?? json['scheduledTime'] ?? '').toString(),
+      date: (json['date'] ?? '').toString(),
       diagnosis: (json['diagnosis'] ?? json['reason'] ?? '').toString(),
       severity: (json['severity'] ?? 'Emergency').toString(),
       status: (json['status'] ?? 'Pending').toString(),

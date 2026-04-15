@@ -39,7 +39,7 @@ class AppointmentsPageState extends State<AppointmentsPage> {
   // Date parameters are now managed in _patientController
   DateTime get _selectedDate => _patientController.selectedDate.value;
   set _selectedDate(DateTime d) => _patientController.selectedDate.value = d;
-  
+
   String get _searchQuery => _patientController.searchQuery.value;
   set _searchQuery(String s) => _patientController.searchQuery.value = s;
 
@@ -57,12 +57,20 @@ class AppointmentsPageState extends State<AppointmentsPage> {
     await launchCallWithLoader(context, _hardcodedPhoneNumber);
   }
 
-  DateTime _parseTime(String timeStr) {
+  DateTime _parseTime(String timeStr, {String? date}) {
     if (timeStr.isEmpty) return DateTime.now();
-    final now = DateTime.now();
+
+    // Use appointment date if provided, otherwise default to today
+    DateTime baseDate = DateTime.now();
+    if (date != null && date.isNotEmpty) {
+      try {
+        baseDate = DateTime.parse(date);
+      } catch (_) {}
+    }
+
     try {
       final parts = timeStr.trim().split(' ');
-      if (parts.length < 2) return now;
+      if (parts.length < 2) return baseDate;
       final timeParts = parts[0].split(':');
       int hour = int.parse(timeParts[0]);
       int minute = int.parse(timeParts[1]);
@@ -71,14 +79,15 @@ class AppointmentsPageState extends State<AppointmentsPage> {
       if (amPm == "PM" && hour != 12) hour += 12;
       if (amPm == "AM" && hour == 12) hour = 0;
 
-      return DateTime(now.year, now.month, now.day, hour, minute);
+      return DateTime(
+          baseDate.year, baseDate.month, baseDate.day, hour, minute);
     } catch (_) {
-      return now;
+      return baseDate;
     }
   }
 
-  String _formatTimeWithDay(String timeStr) {
-    final parsed = _parseTime(timeStr);
+  String _formatTimeWithDay(String timeStr, {String? date}) {
+    final parsed = _parseTime(timeStr, date: date);
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final diff = DateTime(parsed.year, parsed.month, parsed.day)
@@ -101,13 +110,12 @@ class AppointmentsPageState extends State<AppointmentsPage> {
   }
 
   bool _hasAppointmentPassed(AppointmentModel app) {
-    final appTime = _parseTime(app.time);
+    final appTime = _parseTime(app.time, date: app.date);
     return DateTime.now().isAfter(appTime);
   }
 
   DateTime _dateOnly(DateTime value) =>
       DateTime(value.year, value.month, value.day);
-
 
   int _daysInMonth(DateTime date) {
     final firstOfNextMonth = (date.month == 12)
@@ -120,17 +128,22 @@ class AppointmentsPageState extends State<AppointmentsPage> {
   void initState() {
     super.initState();
     // Initialize controller state if not set
+    // Initialize controller state if not set
     _patientController.selectedDate.value = _dateOnly(DateTime.now());
     _weekPageController =
         PageController(initialPage: _selectedWeekIndexForMonth(_selectedDate));
-    
+
+    // Reset search state on entering the page via its own route
+    _patientController.searchQuery.value = '';
+    _searchController.clear();
+
     _fetchAppointments();
     _loadPersistedStatuses();
-    
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _jumpToSelectedWeek(animate: false);
     });
-    
+
     if (widget.showAddPatient) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _addPatients();
@@ -187,7 +200,6 @@ class AppointmentsPageState extends State<AppointmentsPage> {
     }
   }
 
-
   void _addPatients() {
     TextEditingController nameController = TextEditingController();
     TextEditingController ageController = TextEditingController();
@@ -201,182 +213,205 @@ class AppointmentsPageState extends State<AppointmentsPage> {
             const Color(0xFFC4DAD2).withOpacity(0.5), // Soft Sage Accent
         context: context,
         builder: (context) => StatefulBuilder(
-          builder: (context, setDialogState) => AlertDialog(
-              backgroundColor: Colors.white,
-              insetPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 40),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(24),
-                side: BorderSide(
-                    color: const Color(0xFFC4DAD2),
-                    width: 1.5), // Soft Sage Accent
-              ),
-              title: Text(
-                "Add New Patient",
-                style: TextStyle(
-                  fontFamily: 'Poppins',
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black87,
+              builder: (context, setDialogState) => AlertDialog(
+                backgroundColor: Colors.white,
+                insetPadding:
+                    EdgeInsets.symmetric(horizontal: 20, vertical: 40),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(24),
+                  side: BorderSide(
+                      color: const Color(0xFFC4DAD2),
+                      width: 1.5), // Soft Sage Accent
                 ),
-              ),
-              content: Container(
-                width: MediaQuery.of(context).size.width * 0.9,
-                child: SingleChildScrollView(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      _buildDialogTextField(
-                          nameController, "Patient Name", Icons.person),
-                      SizedBox(height: 16),
-                      Row(
-                        children: [
-                          Expanded(
-                              child: _buildDialogTextField(
-                                  ageController, "Age", Icons.calendar_today)),
-                          SizedBox(width: 12),
-                          Expanded(
-                              child: _buildDialogTextField(
-                                  genderController, "Gender", Icons.wc)),
-                        ],
-                      ),
-                      SizedBox(height: 16),
-                      _buildDialogTextField(
-                          contactController, "Contact Number", Icons.phone),
-                      SizedBox(height: 16),
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: Text(
-                          'Appointment Time Slot',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w600,
-                            color: Colors.grey.shade700,
-                            fontFamily: 'Poppins',
+                title: Text(
+                  "Add New Patient",
+                  style: TextStyle(
+                    fontFamily: 'Poppins',
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                  ),
+                ),
+                content: Container(
+                  width: MediaQuery.of(context).size.width * 0.9,
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _buildDialogTextField(
+                            nameController, "Patient Name", Icons.person),
+                        SizedBox(height: 16),
+                        Row(
+                          children: [
+                            Expanded(
+                                child: _buildDialogTextField(ageController,
+                                    "Age", Icons.calendar_today)),
+                            SizedBox(width: 12),
+                            Expanded(
+                                child: _buildDialogTextField(
+                                    genderController, "Gender", Icons.wc)),
+                          ],
+                        ),
+                        SizedBox(height: 16),
+                        _buildDialogTextField(
+                            contactController, "Contact Number", Icons.phone),
+                        SizedBox(height: 16),
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            'Appointment Time Slot',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              color: Colors.grey.shade700,
+                              fontFamily: 'Poppins',
+                            ),
                           ),
                         ),
-                      ),
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: _doctorSlots.map((slot) {
-                          final isSelected = selectedSlot == slot;
-                          return ChoiceChip(
-                            label: Text(
-                              slot,
-                              style: TextStyle(
-                                color: isSelected ? Colors.white : Colors.black87,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            selected: isSelected,
-                            selectedColor: const Color(0xFF6A9C89),
-                            backgroundColor: const Color(0xFFF2F7F5),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
-                              side: BorderSide(
-                                color: isSelected
-                                    ? const Color(0xFF6A9C89)
-                                    : const Color(0xFFC4DAD2),
-                              ),
-                            ),
-                            onSelected: (_) {
-                              setDialogState(() {
-                                selectedSlot = slot;
-                              });
-                            },
-                          );
-                        }).toList(),
-                      ),
-                      SizedBox(height: 16),
-                      _buildDialogTextField(diagnosisController, "Diagnosis",
-                          Icons.monitor_heart_outlined),
-                      SizedBox(height: 24),
-                      Obx(() => Row(
-                        children: [
-                          Expanded(
-                            child: TextButton(
-                                onPressed: () => Navigator.pop(context),
-                                style: TextButton.styleFrom(
-                                  foregroundColor: Colors.grey,
-                                  padding: EdgeInsets.symmetric(vertical: 12),
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: _doctorSlots.map((slot) {
+                            final isSelected = selectedSlot == slot;
+                            return ChoiceChip(
+                              label: Text(
+                                slot,
+                                style: TextStyle(
+                                  color: isSelected
+                                      ? Colors.white
+                                      : Colors.black87,
+                                  fontWeight: FontWeight.w600,
                                 ),
-                                child: Text("Cancel",
-                                    style: TextStyle(
-                                        fontFamily: 'Poppins',
-                                        fontWeight: FontWeight.w600))),
-                          ),
-                          SizedBox(width: 12),
-                          Expanded(
-                            child: ElevatedButton(
-                                onPressed: _patientController.isLoading.value
-                                    ? null
-                                    : () async {
-                                        if (nameController.text.isNotEmpty &&
-                                            selectedSlot.isNotEmpty) {
-                                          final newPatient = NewPatientResponse(
-                                            patientId: DateTime.now()
-                                                .millisecondsSinceEpoch
-                                                .toString(),
-                                            profile: Profile(
-                                              name: nameController.text,
-                                              age: ageController.text,
-                                              gender: genderController.text,
-                                            ),
-                                            contact: Contact(
-                                              phone: contactController.text,
-                                            ),
-                                            appointment: Appointment(
-                                              scheduledTime: selectedSlot,
-                                              diagnosis: diagnosisController.text,
-                                            ),
-                                          );
-
-                                          final success = await _patientController
-                                              .addPatient(newPatient);
-
-                                          if (success) {
-                                            setState(() {
-                                              appointments.add(AppointmentModel(
-                                                id: newPatient.patientId ?? '',
-                                                patientName: newPatient.profile?.name ?? '',
-                                                time: selectedSlot,
-                                                diagnosis: newPatient.appointment?.diagnosis ?? '',
-                                              ));
-                                            });
-                                            Navigator.pop(context);
-                                          }
-                                        }
-                                      },
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor:
-                                      const Color(0xFF6A9C89), // Sage Green
-                                  foregroundColor: Colors.white,
-                                  padding: EdgeInsets.symmetric(vertical: 12),
-                                  shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12)),
-                                  elevation: 0,
+                              ),
+                              selected: isSelected,
+                              selectedColor: const Color(0xFF6A9C89),
+                              backgroundColor: const Color(0xFFF2F7F5),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                                side: BorderSide(
+                                  color: isSelected
+                                      ? const Color(0xFF6A9C89)
+                                      : const Color(0xFFC4DAD2),
                                 ),
-                                child: _patientController.isLoading.value
-                                    ? SizedBox(
-                                        height: 20,
-                                        width: 20,
-                                        child: CircularProgressIndicator(
-                                          color: Colors.white,
-                                          strokeWidth: 2,
-                                        ),
-                                      )
-                                    : Text("Add",
-                                        style: TextStyle(
-                                            fontFamily: 'Poppins',
-                                            fontWeight: FontWeight.bold))),
-                          ),
-                        ],
-                      ))
-                    ],
+                              ),
+                              onSelected: (_) {
+                                setDialogState(() {
+                                  selectedSlot = slot;
+                                });
+                              },
+                            );
+                          }).toList(),
+                        ),
+                        SizedBox(height: 16),
+                        _buildDialogTextField(diagnosisController, "Diagnosis",
+                            Icons.monitor_heart_outlined),
+                        SizedBox(height: 24),
+                        Obx(() => Row(
+                              children: [
+                                Expanded(
+                                  child: TextButton(
+                                      onPressed: () => Navigator.pop(context),
+                                      style: TextButton.styleFrom(
+                                        foregroundColor: Colors.grey,
+                                        padding:
+                                            EdgeInsets.symmetric(vertical: 12),
+                                      ),
+                                      child: Text("Cancel",
+                                          style: TextStyle(
+                                              fontFamily: 'Poppins',
+                                              fontWeight: FontWeight.w600))),
+                                ),
+                                SizedBox(width: 12),
+                                Expanded(
+                                  child: ElevatedButton(
+                                      onPressed: _patientController
+                                              .isLoading.value
+                                          ? null
+                                          : () async {
+                                              if (nameController
+                                                      .text.isNotEmpty &&
+                                                  selectedSlot.isNotEmpty) {
+                                                final newPatient =
+                                                    NewPatientResponse(
+                                                  patientId: DateTime.now()
+                                                      .millisecondsSinceEpoch
+                                                      .toString(),
+                                                  profile: Profile(
+                                                    name: nameController.text,
+                                                    age: ageController.text,
+                                                    gender:
+                                                        genderController.text,
+                                                  ),
+                                                  contact: Contact(
+                                                    phone:
+                                                        contactController.text,
+                                                  ),
+                                                  appointment: Appointment(
+                                                    scheduledTime: selectedSlot,
+                                                    diagnosis:
+                                                        diagnosisController
+                                                            .text,
+                                                  ),
+                                                );
+
+                                                final success =
+                                                    await _patientController
+                                                        .addPatient(newPatient);
+
+                                                if (success) {
+                                                  setState(() {
+                                                    appointments
+                                                        .add(AppointmentModel(
+                                                      id: newPatient
+                                                              .patientId ??
+                                                          '',
+                                                      patientName: newPatient
+                                                              .profile?.name ??
+                                                          '',
+                                                      time: selectedSlot,
+                                                      diagnosis: newPatient
+                                                              .appointment
+                                                              ?.diagnosis ??
+                                                          '',
+                                                    ));
+                                                  });
+                                                  Navigator.pop(context);
+                                                }
+                                              }
+                                            },
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: const Color(
+                                            0xFF6A9C89), // Sage Green
+                                        foregroundColor: Colors.white,
+                                        padding:
+                                            EdgeInsets.symmetric(vertical: 12),
+                                        shape: RoundedRectangleBorder(
+                                            borderRadius:
+                                                BorderRadius.circular(12)),
+                                        elevation: 0,
+                                      ),
+                                      child: _patientController.isLoading.value
+                                          ? SizedBox(
+                                              height: 20,
+                                              width: 20,
+                                              child: CircularProgressIndicator(
+                                                color: Colors.white,
+                                                strokeWidth: 2,
+                                              ),
+                                            )
+                                          : Text("Add",
+                                              style: TextStyle(
+                                                  fontFamily: 'Poppins',
+                                                  fontWeight:
+                                                      FontWeight.bold))),
+                                ),
+                              ],
+                            ))
+                      ],
+                    ),
                   ),
                 ),
               ),
-            ),
-        ));
+            ));
   }
 
   Widget _buildDialogTextField(
@@ -460,7 +495,7 @@ class AppointmentsPageState extends State<AppointmentsPage> {
           ],
         ),
       ),
-      bottomSheet: DoctorFooter(),
+      bottomSheet: const DoctorFooter(selectedIndex: 4),
     );
   }
 
@@ -522,7 +557,8 @@ class AppointmentsPageState extends State<AppointmentsPage> {
           prefixIcon: Icon(Icons.search, color: const Color(0xFF6A9C89)),
           suffixIcon: _searchQuery.isNotEmpty
               ? IconButton(
-                  icon: Icon(Icons.clear, color: Colors.grey.shade400, size: 20),
+                  icon:
+                      Icon(Icons.clear, color: Colors.grey.shade400, size: 20),
                   onPressed: () {
                     _searchController.clear();
                     _searchQuery = '';
@@ -553,47 +589,64 @@ class AppointmentsPageState extends State<AppointmentsPage> {
   }
 
   Widget _buildAppointmentsSection() {
-    // Data comes from the controller (API driven).
-    // Sorting is done client-side for display order.
-    final sorted = List<AppointmentModel>.from(appointments)
-      ..sort((a, b) => _parseTime(a.time).compareTo(_parseTime(b.time)));
-
-    final listToShow =
-        widget.showOnlyToday ? sorted.take(5).toList() : sorted;
-
-    final emptyMessage = _searchQuery.isNotEmpty
-        ? "No patients found for '$_searchQuery'"
-        : "No appointments on selected date";
-
     return Expanded(
       child: Obx(() {
         if (_patientController.isLoading.value) {
           return const Center(child: CircularProgressIndicator());
         }
+
+        // Data comes from the controller (API driven).
+        // Sorting is done client-side for display order.
+        final sorted = List<AppointmentModel>.from(appointments)
+          ..sort((a, b) => _parseTime(a.time, date: a.date)
+              .compareTo(_parseTime(b.time, date: b.date)));
+
+        final listToShow =
+            widget.showOnlyToday ? sorted.take(5).toList() : sorted;
+
+        final emptyMessage = _searchQuery.isNotEmpty
+            ? "No patients found for '$_searchQuery'"
+            : "No appointments on selected date";
+
         if (listToShow.isEmpty) {
-          return Center(
-            child: Text(emptyMessage,
-                style: TextStyle(fontFamily: 'Poppins', color: Colors.grey)),
+          return RefreshIndicator(
+            onRefresh: _fetchAppointments,
+            color: const Color(0xFF6A9C89),
+            child: ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              children: [
+                SizedBox(height: MediaQuery.of(context).size.height * 0.2),
+                Center(
+                  child: Text(emptyMessage,
+                      style:
+                          TextStyle(fontFamily: 'Poppins', color: Colors.grey)),
+                ),
+              ],
+            ),
           );
         }
-        return NotificationListener<ScrollNotification>(
-              onNotification: (notification) {
-                if (notification is ScrollUpdateNotification) {
-                  final offset = notification.metrics.pixels;
-                  if (offset > 2 && _calendarExpanded) {
-                    setState(() => _calendarExpanded = false);
-                  } else if (offset <= 0 && !_calendarExpanded) {
-                    setState(() => _calendarExpanded = true);
-                  }
+
+        return RefreshIndicator(
+          onRefresh: _fetchAppointments,
+          color: const Color(0xFF6A9C89),
+          child: NotificationListener<ScrollNotification>(
+            onNotification: (notification) {
+              if (notification is ScrollUpdateNotification) {
+                final offset = notification.metrics.pixels;
+                if (offset > 2 && _calendarExpanded) {
+                  setState(() => _calendarExpanded = false);
+                } else if (offset <= 0 && !_calendarExpanded) {
+                  setState(() => _calendarExpanded = true);
                 }
-                return false;
-              },
-              child: ListView.builder(
+              }
+              return false;
+            },
+            child: ListView.builder(
+              physics: const AlwaysScrollableScrollPhysics(),
               padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
               itemCount: listToShow.length,
               itemBuilder: (context, index) {
                 final appointment = listToShow[index];
-                final originalIndex = appointments.indexOf(appointment);
                 final persistedStatus = _persistedStatuses[appointment.id];
                 final isPending =
                     persistedStatus != null && persistedStatus == 'Pending';
@@ -641,128 +694,117 @@ class AppointmentsPageState extends State<AppointmentsPage> {
                                 children: [
                                   Row(
                                     children: [
-                                      Text(
-                                        appointment.patientName,
-                                        style: TextStyle(
-                                          fontFamily: 'Poppins',
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 16,
-                                          color: Colors.black87,
+                                      Flexible(
+                                        child: Text(
+                                          appointment.patientName,
+                                          style: const TextStyle(
+                                            fontFamily: 'Poppins',
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 16,
+                                            color: Colors.black87,
+                                          ),
+                                          overflow: TextOverflow.ellipsis,
                                         ),
                                       ),
                                       if (isPending) ...[
-                                        SizedBox(width: 6),
-                                        Icon(
-                                          Icons.warning_amber_rounded,
-                                          size: 18,
-                                          color: Colors.orange,
-                                        ),
+                                        const SizedBox(width: 6),
+                                        const Icon(Icons.warning_amber_rounded,
+                                            size: 18, color: Colors.orange),
                                       ],
                                     ],
                                   ),
-                                  SizedBox(height: 4),
-                                  Container(
-                                    padding: EdgeInsets.symmetric(
-                                        horizontal: 8, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: isPending
-                                          ? Colors.orange.withOpacity(0.1)
-                                          : const Color(0xFF6A9C89)
-                                              .withOpacity(0.1),
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: Text(
-                                      persistedStatus == 'Scheduled' &&
-                                              _hasAppointmentPassed(appointment)
-                                          ? "Status: Scheduled (Overdue)"
-                                          : (persistedStatus == 'Scheduled'
-                                              ? "Scheduled"
-                                              : (persistedStatus ??
-                                                  "Scheduled")),
-                                      style: TextStyle(
-                                        fontFamily: 'Poppins',
-                                        fontSize: 12,
-                                        color: persistedStatus == 'Scheduled' &&
-                                                _hasAppointmentPassed(
-                                                    appointment)
-                                            ? Colors.orange.shade800
-                                            : const Color(0xFF6A9C89),
-                                        fontWeight: FontWeight.w500,
-                                      ),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    "Last Visit: ${appointment.patient?.medicalHistory?.lastVisitDate ?? ""}",
+                                    style: TextStyle(
+                                      fontFamily: 'Poppins',
+                                      fontSize: 12,
+                                      color: Colors.grey.shade600,
+                                      fontWeight: FontWeight.w500,
                                     ),
                                   ),
                                 ],
                               ),
                             ),
-                            IconButton(
-                              onPressed: () async {
-                                // Create a dummy PatientModel for navigation since we don't have full details here
-                                // In a real app, you might fetch details by ID
-                                final patient = NewPatientResponse(
-                                  patientId: appointment.id,
-                                  profile: Profile(
-                                    name: appointment.patientName,
-                                    age: "35",
-                                    gender: "Male",
-                                    bloodGroup: "O+",
+                            // Optimized Status Pill with Dot Indicator
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(
+                                  color: persistedStatus == 'Scheduled' &&
+                                          _hasAppointmentPassed(appointment)
+                                      ? Colors.orange.withOpacity(0.3)
+                                      : const Color(0xFF6A9C89)
+                                          .withOpacity(0.3),
+                                  width: 1,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Container(
+                                    width: 6,
+                                    height: 6,
+                                    decoration: BoxDecoration(
+                                      color: persistedStatus == 'Scheduled' &&
+                                              _hasAppointmentPassed(appointment)
+                                          ? Colors.orange
+                                          : const Color(0xFF6A9C89),
+                                      shape: BoxShape.circle,
+                                    ),
                                   ),
-                                  contact: Contact(
-                                    phone: "+1 234-567-8900",
-                                    email: "patient@email.com",
-                                    address: "123 Main St",
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    persistedStatus == 'Scheduled' &&
+                                            _hasAppointmentPassed(appointment)
+                                        ? "Overdue"
+                                        : (persistedStatus ??
+                                            appointment.status),
+                                    style: TextStyle(
+                                      fontFamily: 'Poppins',
+                                      color: persistedStatus == 'Scheduled' &&
+                                              _hasAppointmentPassed(appointment)
+                                          ? Colors.orange.shade800
+                                          : const Color(0xFF6A9C89),
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 11,
+                                    ),
                                   ),
-                                  appointment: Appointment(
-                                    diagnosis: appointment.diagnosis,
-                                    scheduledTime: appointment.time,
-                                    symptoms: "Checkup",
-                                  ),
-                                  medicalHistory: MedicalHistory(
-                                    historyNotes: "None",
-                                    currentMedications: "None",
-                                    allergies: "None",
-                                    lastVisitDate: "2024-01-01",
-                                  ),
-                                );
-
-                                await Get.to(() => PatientDetails(
-                                      patient: patient,
-                                      appointment: appointment,
-                                    ));
-
-                                // Reload persisted statuses so alerts update if status changed.
-                                _loadPersistedStatuses();
-                              },
-                              icon: Icon(Icons.arrow_forward_ios_rounded,
-                                  size: 16, color: Colors.grey.shade400),
-                            )
+                                ],
+                              ),
+                            ),
                           ],
                         ),
                       ),
-                      Divider(
-                          height: 1,
-                          thickness: 1,
-                          color: const Color(0xFFF2F7F5)),
+                      const Divider(
+                          height: 1, thickness: 1, color: Color(0xFFF2F7F5)),
                       Container(
-                        padding:
-                            EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 12),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
+                            // Time chip
                             Container(
-                              padding: EdgeInsets.symmetric(
+                              padding: const EdgeInsets.symmetric(
                                   horizontal: 12, vertical: 6),
                               decoration: BoxDecoration(
-                                color: const Color(0xFF6A9C89), // Sage Green
+                                color: const Color(0xFF6A9C89),
                                 borderRadius: BorderRadius.circular(20),
                               ),
                               child: Row(
+                                mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Icon(Icons.access_time,
+                                  const Icon(Icons.access_time,
                                       size: 14, color: Colors.white),
-                                  SizedBox(width: 6),
+                                  const SizedBox(width: 6),
                                   Text(
-                                    _formatTimeWithDay(appointment.time),
-                                    style: TextStyle(
+                                    _formatTimeWithDay(appointment.time,
+                                        date: appointment.date),
+                                    style: const TextStyle(
                                         color: Colors.white,
                                         fontFamily: 'Poppins',
                                         fontSize: 12,
@@ -771,26 +813,55 @@ class AppointmentsPageState extends State<AppointmentsPage> {
                                 ],
                               ),
                             ),
-                            Row(
-                              children: [
-                                _buildActionIcon(Icons.call, () {
-                                  _callHardcodedNumber();
-                                }),
-                                SizedBox(width: 12),
-                                _buildActionIcon(Icons.message_outlined, () {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                          content: Text(
-                                              "Messaging ${appointment.patientName}...")));
-                                }),
-                                SizedBox(width: 12),
-                                _buildActionIcon(Icons.delete_outline, () {
-                                  setState(() {
-                                    appointments.removeAt(originalIndex);
-                                  });
-                                }, isDestructive: true),
-                              ],
-                            )
+                            const SizedBox(width: 24),
+                            // Action icons
+                            _buildActionIcon(Icons.call, () {
+                              _callHardcodedNumber();
+                            }),
+                            const SizedBox(width: 8),
+                            _buildActionIcon(Icons.message_outlined, () {
+                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                                  content: Text(
+                                      "Messaging ${appointment.patientName}...")));
+                            }),
+                            const SizedBox(width: 8),
+                            _buildActionIcon(
+                              Icons.arrow_forward_ios_rounded,
+                              () async {
+                                final patient = appointment.patient ??
+                                    NewPatientResponse(
+                                      patientId: appointment.id,
+                                      profile: Profile(
+                                        name: appointment.patientName,
+                                        age: "35",
+                                        gender: "Male",
+                                        bloodGroup: "O+",
+                                      ),
+                                      contact: Contact(
+                                        phone: "+1 234-567-8900",
+                                        email: "patient@email.com",
+                                        address: "123 Main St",
+                                      ),
+                                      appointment: Appointment(
+                                        diagnosis: appointment.diagnosis,
+                                        scheduledTime: appointment.time,
+                                        symptoms: "Checkup",
+                                      ),
+                                      medicalHistory: MedicalHistory(
+                                        historyNotes: "None",
+                                        currentMedications: "None",
+                                        allergies: "None",
+                                        lastVisitDate: "2024-01-01",
+                                      ),
+                                    );
+
+                                await Get.to(() => PatientDetails(
+                                      patient: patient,
+                                      appointment: appointment,
+                                    ));
+                                _loadPersistedStatuses();
+                              },
+                            ),
                           ],
                         ),
                       )
@@ -799,8 +870,9 @@ class AppointmentsPageState extends State<AppointmentsPage> {
                 );
               },
             ),
-          );
-        }),
+          ),
+        );
+      }),
     );
   }
 
@@ -848,13 +920,13 @@ class AppointmentsPageState extends State<AppointmentsPage> {
               Expanded(
                 child: Center(
                   child: Text(
-                monthYearLabel,
-                style: TextStyle(
-                  fontFamily: 'Poppins',
-                  fontWeight: FontWeight.w600,
-                  color: Colors.grey.shade800,
-                ),
-              ),
+                    monthYearLabel,
+                    style: TextStyle(
+                      fontFamily: 'Poppins',
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey.shade800,
+                    ),
+                  ),
                 ),
               ),
               InkWell(
@@ -912,7 +984,8 @@ class AppointmentsPageState extends State<AppointmentsPage> {
                       _selectedDate.month,
                       dayNumber,
                     );
-                    final isSelected = DateUtils.isSameDay(date, _patientController.selectedDate.value);
+                    final isSelected = DateUtils.isSameDay(
+                        date, _patientController.selectedDate.value);
                     return Expanded(
                       child: InkWell(
                         borderRadius: BorderRadius.circular(12),
@@ -939,8 +1012,9 @@ class AppointmentsPageState extends State<AppointmentsPage> {
                               '$dayNumber',
                               style: TextStyle(
                                 fontSize: 15,
-                                fontWeight:
-                                    isSelected ? FontWeight.w800 : FontWeight.w600,
+                                fontWeight: isSelected
+                                    ? FontWeight.w800
+                                    : FontWeight.w600,
                                 color: isSelected
                                     ? const Color(0xFF6A9C89)
                                     : Colors.black87,

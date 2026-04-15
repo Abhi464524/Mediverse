@@ -12,11 +12,17 @@ class EndPoints {
 
   // Doctor APIs
   static String get medicineDetailsURL => '$baseURL/medicines';
+  static String get doctorGetProfileURL => '$baseURL/doctor/getProfile';
   static String get doctorProfileURL => '$baseURL/doctor/profile';
   static String get addPatientURL => '$baseURL/doctor/add-patient';
-  static String get doctorAppointmentsURL => '$baseURL/doctor/appointments';
+  static String get updatePatientURL => '$baseURL/doctor/update-patient';
+  static String get doctorAppointmentsURL => '$baseURL/doctor/getAppointments';
   static String get emergencyAppointmentsURL =>
-      '$baseURL/doctor/emergency-appointments';
+      '$baseURL/doctor/getEmergencyAppointments';
+  static String get updateAppointmentURL =>
+      '$baseURL/doctor/updateAppointments';
+  static String get updateEmergencyAppointmentURL =>
+      '$baseURL/doctor/updateEmergencyAppointments';
 
   // Patient APIs
   static String get patientProfileURL => '$baseURL/patient/profile';

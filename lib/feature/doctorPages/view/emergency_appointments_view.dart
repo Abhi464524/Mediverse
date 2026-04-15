@@ -33,7 +33,7 @@ class _EmergencyAppointmentsPageState extends State<EmergencyAppointmentsPage> {
   // Date parameters are now managed in _controller
   DateTime get _selectedDate => _controller.selectedDate.value;
   set _selectedDate(DateTime d) => _controller.selectedDate.value = d;
-  
+
   String get _searchQuery => _controller.searchQuery.value;
   set _searchQuery(String s) => _controller.searchQuery.value = s;
 
@@ -46,26 +46,34 @@ class _EmergencyAppointmentsPageState extends State<EmergencyAppointmentsPage> {
 
   DateTime _dateOnly(DateTime d) => DateTime(d.year, d.month, d.day);
 
-  DateTime _parseTime(String timeStr) {
+  DateTime _parseTime(String timeStr, {String? date}) {
     if (timeStr.isEmpty) return DateTime.now();
-    final now = DateTime.now();
+
+    // Use appointment date if provided, otherwise default to today
+    DateTime baseDate = DateTime.now();
+    if (date != null && date.isNotEmpty) {
+      try {
+        baseDate = DateTime.parse(date);
+      } catch (_) {}
+    }
+
     try {
       final parts = timeStr.trim().split(' ');
-      if (parts.length < 2) return now;
+      if (parts.length < 2) return baseDate;
       final tp = parts[0].split(':');
       int h = int.parse(tp[0]);
       int m = int.parse(tp[1]);
       final amPm = parts[1].toUpperCase();
       if (amPm == 'PM' && h != 12) h += 12;
       if (amPm == 'AM' && h == 12) h = 0;
-      return DateTime(now.year, now.month, now.day, h, m);
+      return DateTime(baseDate.year, baseDate.month, baseDate.day, h, m);
     } catch (_) {
-      return now;
+      return baseDate;
     }
   }
 
-  String _formatTimeWithDay(String timeStr) {
-    final parsed = _parseTime(timeStr);
+  String _formatTimeWithDay(String timeStr, {String? date}) {
+    final parsed = _parseTime(timeStr, date: date);
     final today = _dateOnly(DateTime.now());
     final diff = _dateOnly(parsed).difference(today).inDays;
     String dayLabel;
@@ -83,7 +91,7 @@ class _EmergencyAppointmentsPageState extends State<EmergencyAppointmentsPage> {
   }
 
   bool _hasAppointmentPassed(EmergencyAppointmentModel app) =>
-      DateTime.now().isAfter(_parseTime(app.time));
+      DateTime.now().isAfter(_parseTime(app.time, date: app.date));
 
   int _daysInMonth(DateTime date) {
     final next = (date.month == 12)
@@ -111,8 +119,18 @@ class _EmergencyAppointmentsPageState extends State<EmergencyAppointmentsPage> {
 
   String _monthLabel(int month) {
     const labels = [
-      'January', 'February', 'March', 'April', 'May', 'June',
-      'July', 'August', 'September', 'October', 'November', 'December',
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December',
     ];
     return labels[month - 1];
   }
@@ -128,7 +146,7 @@ class _EmergencyAppointmentsPageState extends State<EmergencyAppointmentsPage> {
 
   Future<void> _fetchEmergencyAppointments() async {
     await _controller.loadEmergencyAppointments(
-      date: _searchQuery.isEmpty ? _formatDateParam(_selectedDate) : null,
+      date: _formatDateParam(_selectedDate),
       search: _searchQuery.isNotEmpty ? _searchQuery : null,
     );
   }
@@ -156,11 +174,15 @@ class _EmergencyAppointmentsPageState extends State<EmergencyAppointmentsPage> {
   @override
   void initState() {
     super.initState();
+    // Reset search state on entering the page
+    _controller.searchQuery.value = '';
+    _searchController.clear();
+
     // Initialize controller state if not set
     _controller.selectedDate.value = _dateOnly(DateTime.now());
     _weekPageController =
         PageController(initialPage: _selectedWeekIndexForMonth(_selectedDate));
-    
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         _fetchEmergencyAppointments().then((_) => _loadPersistedStatuses());
@@ -232,7 +254,7 @@ class _EmergencyAppointmentsPageState extends State<EmergencyAppointmentsPage> {
           ],
         ),
       ),
-      bottomSheet: const DoctorFooter(),
+      bottomSheet: const DoctorFooter(selectedIndex: 3),
     );
   }
 
@@ -292,7 +314,8 @@ class _EmergencyAppointmentsPageState extends State<EmergencyAppointmentsPage> {
           prefixIcon: const Icon(Icons.search, color: _kAccent),
           suffixIcon: _searchQuery.isNotEmpty
               ? IconButton(
-                  icon: Icon(Icons.clear, color: Colors.grey.shade400, size: 20),
+                  icon:
+                      Icon(Icons.clear, color: Colors.grey.shade400, size: 20),
                   onPressed: () {
                     _searchController.clear();
                     setState(() => _searchQuery = '');
@@ -347,7 +370,8 @@ class _EmergencyAppointmentsPageState extends State<EmergencyAppointmentsPage> {
           );
         }
 
-        final listToShow = List<EmergencyAppointmentModel>.from(_controller.appointments)
+        final listToShow = List<EmergencyAppointmentModel>.from(
+            _controller.appointments)
           ..sort((a, b) => _parseTime(a.time).compareTo(_parseTime(b.time)));
 
         if (listToShow.isEmpty) {
@@ -378,8 +402,7 @@ class _EmergencyAppointmentsPageState extends State<EmergencyAppointmentsPage> {
             color: _kAccent,
             onRefresh: _fetchEmergencyAppointments,
             child: ListView.builder(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
               itemCount: listToShow.length,
               itemBuilder: (context, index) =>
                   _buildAppointmentCard(listToShow[index]),
@@ -394,8 +417,7 @@ class _EmergencyAppointmentsPageState extends State<EmergencyAppointmentsPage> {
 
   Widget _buildAppointmentCard(EmergencyAppointmentModel item) {
     final persistedStatus = _persistedStatuses[item.id];
-    final isPending =
-        persistedStatus != null && persistedStatus == 'Pending';
+    final isPending = persistedStatus != null && persistedStatus == 'Pending';
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -428,8 +450,7 @@ class _EmergencyAppointmentsPageState extends State<EmergencyAppointmentsPage> {
                   child: const CircleAvatar(
                     radius: 24,
                     backgroundColor: _kAccentSurface,
-                    child:
-                        Icon(Icons.emergency_rounded, color: _kAccent),
+                    child: Icon(Icons.emergency_rounded, color: _kAccent),
                   ),
                 ),
                 const SizedBox(width: 16),
@@ -481,8 +502,8 @@ class _EmergencyAppointmentsPageState extends State<EmergencyAppointmentsPage> {
                 ),
                 // Status chip
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 10, vertical: 6),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   decoration: BoxDecoration(
                     color: _kAccentSurface,
                     borderRadius: BorderRadius.circular(20),
@@ -505,14 +526,14 @@ class _EmergencyAppointmentsPageState extends State<EmergencyAppointmentsPage> {
 
           // ── Bottom row: time + diagnosis + actions ──
           Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 // Time chip
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 12, vertical: 6),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
                     color: _kAccent,
                     borderRadius: BorderRadius.circular(20),
@@ -524,7 +545,7 @@ class _EmergencyAppointmentsPageState extends State<EmergencyAppointmentsPage> {
                           size: 14, color: Colors.white),
                       const SizedBox(width: 6),
                       Text(
-                        _formatTimeWithDay(item.time),
+                        _formatTimeWithDay(item.time, date: item.date),
                         style: const TextStyle(
                           color: Colors.white,
                           fontFamily: 'Poppins',
@@ -535,28 +556,13 @@ class _EmergencyAppointmentsPageState extends State<EmergencyAppointmentsPage> {
                     ],
                   ),
                 ),
-                const SizedBox(width: 12),
-                // Diagnosis
-                Expanded(
-                  child: Text(
-                    item.diagnosis,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontFamily: 'Poppins',
-                      color: Colors.black54,
-                      fontSize: 13,
-                    ),
-                  ),
-                ),
+                const SizedBox(width: 24),
                 // Action icons
                 _buildActionIcon(Icons.call, () => _callHardcodedNumber()),
                 const SizedBox(width: 8),
                 _buildActionIcon(Icons.message_outlined, () {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                        content:
-                            Text('Messaging ${item.patientName}...')),
+                    SnackBar(content: Text('Messaging ${item.patientName}...')),
                   );
                 }),
                 const SizedBox(width: 8),
@@ -636,8 +642,7 @@ class _EmergencyAppointmentsPageState extends State<EmergencyAppointmentsPage> {
   // ── Calendar ──
 
   Widget _buildCalendarDateFilter() {
-    final firstOfMonth =
-        DateTime(_selectedDate.year, _selectedDate.month, 1);
+    final firstOfMonth = DateTime(_selectedDate.year, _selectedDate.month, 1);
     final totalDays = _daysInMonth(_selectedDate);
     final leadingEmpty = firstOfMonth.weekday % 7;
     final totalCells = leadingEmpty + totalDays;
@@ -738,8 +743,7 @@ class _EmergencyAppointmentsPageState extends State<EmergencyAppointmentsPage> {
                     }
                     final date = DateTime(
                         _selectedDate.year, _selectedDate.month, dayNumber);
-                    final isSelected =
-                        DateUtils.isSameDay(date, _selectedDate);
+                    final isSelected = DateUtils.isSameDay(date, _selectedDate);
                     return Expanded(
                       child: InkWell(
                         borderRadius: BorderRadius.circular(12),
@@ -766,8 +770,7 @@ class _EmergencyAppointmentsPageState extends State<EmergencyAppointmentsPage> {
                                 fontWeight: isSelected
                                     ? FontWeight.w800
                                     : FontWeight.w600,
-                                color:
-                                    isSelected ? _kAccent : Colors.black87,
+                                color: isSelected ? _kAccent : Colors.black87,
                               ),
                             ),
                           ),

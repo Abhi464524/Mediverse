@@ -1,17 +1,18 @@
 import 'package:mediverse/feature/doctorPages/view/doctor_footer_view.dart';
 import 'package:mediverse/feature/doctorPages/view/doc_notification_view.dart';
 import 'package:mediverse/feature/doctorPages/view/patient_details_view.dart';
+import 'package:mediverse/feature/doctorPages/view/emergency_appointments_view.dart';
+import 'package:mediverse/feature/doctorPages/view/appointments_view.dart';
+import 'package:mediverse/feature/doctorPages/view/doctor_profile_view.dart';
+import 'package:mediverse/feature/doctorPages/view/edit_doctor_profile_view.dart';
+import 'package:mediverse/feature/doctorPages/view/digital_prescription_view.dart';
+import '../controller/patient_controller.dart';
 import 'package:mediverse/feature/doctorPages/model/patient_model.dart';
+import '../model/appointment_model.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'dart:io';
 import '../../../common/services/storage_service.dart';
-import '../model/appointment_model.dart';
-import 'appointments_view.dart';
-import 'doctor_profile_view.dart';
-import 'edit_doctor_profile_view.dart';
-import 'digital_prescription_view.dart';
-import 'emergency_appointments_view.dart';
 
 class DoctorHomePage extends StatefulWidget {
   final String name;
@@ -28,52 +29,42 @@ class _DoctorHomePageState extends State<DoctorHomePage> {
   final Map<String, String> _persistedStatuses = {};
   File? _profileImageFile;
 
-  final List<AppointmentModel> appointments = [
-    AppointmentModel(
-        id: '1',
-        patientName: "Patient 1",
-        time: "10:00 AM",
-        diagnosis: "Derma"),
-    AppointmentModel(
-        id: '2',
-        patientName: "Patient 2",
-        time: "11:30 AM",
-        diagnosis: "Derma"),
-    AppointmentModel(
-        id: '3',
-        patientName: "Patient 3",
-        time: "02:00 PM",
-        diagnosis: "Derma"),
-    AppointmentModel(
-        id: '4',
-        patientName: "Patient 4",
-        time: "04:15 PM",
-        diagnosis: "Derma"),
-    AppointmentModel(
-        id: '5',
-        patientName: "Patient 5",
-        time: "06:00 PM",
-        diagnosis: "Derma"),
-  ];
+  final PatientController _patientController = Get.put(PatientController());
+  
+  List<AppointmentModel> get appointments => _patientController.appointments;
 
-  DateTime _parseTime(String timeStr) {
-    final now = DateTime.now();
-    final parts = timeStr.split(' ');
-    final timeParts = parts[0].split(':');
-    int hour = int.parse(timeParts[0]);
-    int minute = int.parse(timeParts[1]);
-    final amPm = parts[1].toUpperCase();
+  DateTime _parseTime(String timeStr, {String? date}) {
+    if (timeStr.isEmpty) return DateTime.now();
+    
+    // Use appointment date if provided, otherwise default to today
+    DateTime baseDate = DateTime.now();
+    if (date != null && date.isNotEmpty) {
+      try {
+        baseDate = DateTime.parse(date);
+      } catch (_) {}
+    }
 
-    if (amPm == "PM" && hour != 12) hour += 12;
-    if (amPm == "AM" && hour == 12) hour = 0;
+    try {
+      final parts = timeStr.trim().split(' ');
+      if (parts.length < 2) return baseDate;
+      final timeParts = parts[0].split(':');
+      int hour = int.parse(timeParts[0]);
+      int minute = int.parse(timeParts[1]);
+      final amPm = parts[1].toUpperCase();
 
-    return DateTime(now.year, now.month, now.day, hour, minute);
+      if (amPm == "PM" && hour != 12) hour += 12;
+      if (amPm == "AM" && hour == 12) hour = 0;
+
+      return DateTime(baseDate.year, baseDate.month, baseDate.day, hour, minute);
+    } catch (_) {
+      return baseDate;
+    }
   }
 
   /// Returns a display string with a day label prefix.
   /// e.g. "Today, 10:00 AM" or "05-04, 10:00 AM"
-  String _formatTimeWithDay(String timeStr) {
-    final parsed = _parseTime(timeStr);
+  String _formatTimeWithDay(String timeStr, {String? date}) {
+    final parsed = _parseTime(timeStr, date: date);
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final diff = DateTime(parsed.year, parsed.month, parsed.day)
@@ -98,13 +89,14 @@ class _DoctorHomePageState extends State<DoctorHomePage> {
   List<AppointmentModel> get upcomingAppointments {
     final now = DateTime.now();
     return appointments
-        .where((app) => _parseTime(app.time).isAfter(now))
+        .where((app) => _parseTime(app.time, date: app.date).isAfter(now))
         .toList()
-      ..sort((a, b) => _parseTime(a.time).compareTo(_parseTime(b.time)));
+      ..sort((a, b) => _parseTime(a.time, date: a.date)
+          .compareTo(_parseTime(b.time, date: b.date)));
   }
 
   bool _hasAppointmentPassed(AppointmentModel app) {
-    final appTime = _parseTime(app.time);
+    final appTime = _parseTime(app.time, date: app.date);
     return DateTime.now().isAfter(appTime);
   }
 
@@ -137,6 +129,9 @@ class _DoctorHomePageState extends State<DoctorHomePage> {
     _loadDoctorProfileFromStorage();
     _loadProfileImageFromStorage();
     _loadPersistedStatuses();
+
+    // Fetch real appointments from API
+    _patientController.fetchAppointments();
   }
 
   String _profileImageKey(String username) => "doctor_profile_image_$username";
@@ -230,7 +225,7 @@ class _DoctorHomePageState extends State<DoctorHomePage> {
             ],
           ),
         ),
-        bottomSheet: DoctorFooter(),
+        bottomSheet: const DoctorFooter(selectedIndex: 0),
       ),
     );
   }
@@ -415,217 +410,223 @@ class _DoctorHomePageState extends State<DoctorHomePage> {
 
   // 2. Today's Schedule Widget
   Widget _buildTodaysSchedule() {
-    // Show all upcoming appointments plus any past appointments whose status is Pending.
-    final List<AppointmentModel> upcomingList = [];
-    final now = DateTime.now();
+    return Obx(() {
+      // Show all upcoming appointments plus any past appointments whose status is Pending.
+      final List<AppointmentModel> upcomingList = [];
+      final now = DateTime.now();
 
-    for (final app in appointments) {
-      final time = _parseTime(app.time);
-      final status = _statusFor(app);
-      final isUpcoming = time.isAfter(now);
-      final isPending = status == 'Pending';
+      for (final app in appointments) {
+        final time = _parseTime(app.time, date: app.date);
+        final status = _statusFor(app);
+        final isUpcoming = time.isAfter(now);
+        final isPending = status == 'Pending';
 
-      if (isUpcoming || isPending) {
-        if (!upcomingList.any((a) => a.id == app.id)) {
-          upcomingList.add(app);
+        if (isUpcoming || isPending) {
+          if (!upcomingList.any((a) => a.id == app.id)) {
+            upcomingList.add(app);
+          }
         }
       }
-    }
 
-    upcomingList
-        .sort((a, b) => _parseTime(a.time).compareTo(_parseTime(b.time)));
+      upcomingList.sort((a, b) => _parseTime(a.time, date: a.date)
+          .compareTo(_parseTime(b.time, date: b.date)));
 
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: 20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                "Today's Schedule",
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
+      return Container(
+        padding: EdgeInsets.symmetric(horizontal: 20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  "Today's Schedule",
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-              ),
-              TextButton(
-                onPressed: () => Get.to(AppointmentsPage()),
-                child: Text("View All"),
-              ),
-            ],
-          ),
-          SizedBox(height: 12),
-          Container(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(15),
-              border: Border.all(
-                  color: const Color(0xFFC4DAD2),
-                  width: 1.5), // Soft Sage Accent
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFFC4DAD2)
-                      .withOpacity(0.3), // Soft Sage Accent
-                  spreadRadius: 1,
-                  blurRadius: 5,
-                  offset: Offset(0, 2),
+                TextButton(
+                  onPressed: () => Get.to(AppointmentsPage()),
+                  child: Text("View All"),
                 ),
               ],
             ),
-            child: upcomingList.isEmpty
-                ? Padding(
-                    padding: const EdgeInsets.all(20.0),
-                    child: Center(
-                      child: Text(
-                        "No upcoming appointments for today",
-                        style: TextStyle(
-                            color: Colors.grey, fontFamily: 'Poppins'),
+            SizedBox(height: 12),
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(15),
+                border: Border.all(
+                    color: const Color(0xFFC4DAD2),
+                    width: 1.5), // Soft Sage Accent
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFFC4DAD2)
+                        .withOpacity(0.3), // Soft Sage Accent
+                    spreadRadius: 1,
+                    blurRadius: 5,
+                    offset: Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: upcomingList.isEmpty
+                  ? Padding(
+                      padding: const EdgeInsets.all(20.0),
+                      child: Center(
+                        child: Text(
+                          "No upcoming appointments for today",
+                          style: TextStyle(
+                              color: Colors.grey, fontFamily: 'Poppins'),
+                        ),
                       ),
-                    ),
-                  )
-                : ListView.builder(
-                    shrinkWrap: true,
-                    physics: NeverScrollableScrollPhysics(),
-                    itemCount: upcomingList.length,
-                    itemBuilder: (context, index) {
-                      final appointment = upcomingList[index];
-                      final isNext = index == 0;
-                      final status = _statusFor(appointment);
-                      final isPending = status == 'Pending';
-                      return GestureDetector(
-                        onTap: () async {
-                          final patient = NewPatientResponse(
-                            patientId: appointment.id,
-                            profile: Profile(
-                              name: appointment.patientName,
-                              age: "35",
-                              gender: "Male",
-                              bloodGroup: "O+",
-                            ),
-                            contact: Contact(
-                              phone: "+1 234-567-8900",
-                              email: "patient@email.com",
-                              address: "123 Main St",
-                            ),
-                            appointment: Appointment(
-                              diagnosis: appointment.diagnosis,
-                              scheduledTime: appointment.time,
-                              symptoms: "Checkup",
-                            ),
-                            medicalHistory: MedicalHistory(
-                              historyNotes: "None",
-                              currentMedications: "None",
-                              allergies: "None",
-                              lastVisitDate: "2024-01-01",
-                            ),
-                          );
-                          await Get.to(() => PatientDetails(
-                                patient: patient,
-                                appointment: appointment,
-                              ));
-                          await _loadPersistedStatuses();
-                        },
-                        child: Container(
-                          padding: EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: isNext
-                                ? const Color(0xFFF2F7F5)
-                                : Colors.white, // Soft Mint
-                            borderRadius: BorderRadius.circular(15),
-                          ),
-                          child: Row(
-                            children: [
-                              Container(
-                                padding: EdgeInsets.all(8),
-                                decoration: BoxDecoration(
-                                  color: isNext
-                                      ? const Color(0xFF6A9C89) // Sage Green
-                                      : Colors.grey.shade300,
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Text(
-                                  _formatTimeWithDay(appointment.time),
-                                  style: TextStyle(
-                                    color:
-                                        isNext ? Colors.white : Colors.black87,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 12,
-                                  ),
-                                ),
+                    )
+                  : ListView.builder(
+                      shrinkWrap: true,
+                      physics: NeverScrollableScrollPhysics(),
+                      itemCount: upcomingList.length,
+                      itemBuilder: (context, index) {
+                        final appointment = upcomingList[index];
+                        final isNext = index == 0;
+                        final status = _statusFor(appointment);
+                        final isPending = status == 'Pending';
+                        return GestureDetector(
+                          onTap: () async {
+                            final patient = NewPatientResponse(
+                              patientId: appointment.id,
+                              profile: Profile(
+                                name: appointment.patientName,
+                                age: "35",
+                                gender: "Male",
+                                bloodGroup: "O+",
                               ),
-                              SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
-                                      children: [
-                                        Text(
-                                          appointment.patientName,
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 14,
-                                          ),
-                                        ),
-                                        if (isPending) ...[
-                                          SizedBox(width: 6),
-                                          Icon(
-                                            Icons.warning_amber_rounded,
-                                            size: 16,
-                                            color: Colors.orange,
-                                          ),
-                                        ],
-                                      ],
-                                    ),
-                                    Text(
-                                      status == 'Scheduled' &&
-                                              _hasAppointmentPassed(appointment)
-                                          ? "Status: Scheduled (Overdue)"
-                                          : (status == 'Scheduled'
-                                              ? "Scheduled"
-                                              : status),
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: status == 'Scheduled' &&
-                                                _hasAppointmentPassed(
-                                                    appointment)
-                                            ? Colors.orange.shade800
-                                            : Colors.grey.shade600,
-                                      ),
-                                    ),
-                                  ],
-                                ),
+                              contact: Contact(
+                                phone: "+1 234-567-8900",
+                                email: "patient@email.com",
+                                address: "123 Main St",
                               ),
-                              if (isNext)
+                              appointment: Appointment(
+                                diagnosis: appointment.diagnosis,
+                                scheduledTime: appointment.time,
+                                symptoms: "Checkup",
+                              ),
+                              medicalHistory: MedicalHistory(
+                                historyNotes: "None",
+                                currentMedications: "None",
+                                allergies: "None",
+                                lastVisitDate: "2024-01-01",
+                              ),
+                            );
+                            await Get.to(() => PatientDetails(
+                                  patient: patient,
+                                  appointment: appointment,
+                                ));
+                            await _loadPersistedStatuses();
+                          },
+                          child: Container(
+                            padding: EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: isNext
+                                  ? const Color(0xFFF2F7F5)
+                                  : Colors.white, // Soft Mint
+                              borderRadius: BorderRadius.circular(15),
+                            ),
+                            child: Row(
+                              children: [
                                 Container(
-                                  padding: EdgeInsets.symmetric(
-                                      horizontal: 8, vertical: 4),
+                                  padding: EdgeInsets.all(8),
                                   decoration: BoxDecoration(
-                                    color:
-                                        const Color(0xFF6A9C89), // Sage Green
-                                    borderRadius: BorderRadius.circular(12),
+                                    color: isNext
+                                        ? const Color(0xFF6A9C89) // Sage Green
+                                        : Colors.grey.shade300,
+                                    borderRadius: BorderRadius.circular(8),
                                   ),
                                   child: Text(
-                                    "Next",
+                                    _formatTimeWithDay(appointment.time,
+                                        date: appointment.date),
                                     style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 10,
+                                      color: isNext
+                                          ? Colors.white
+                                          : Colors.black87,
                                       fontWeight: FontWeight.bold,
+                                      fontSize: 12,
                                     ),
                                   ),
                                 ),
-                            ],
+                                SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Text(
+                                            appointment.patientName,
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 14,
+                                            ),
+                                          ),
+                                          if (isPending) ...[
+                                            SizedBox(width: 6),
+                                            Icon(
+                                              Icons.warning_amber_rounded,
+                                              size: 16,
+                                              color: Colors.orange,
+                                            ),
+                                          ],
+                                        ],
+                                      ),
+                                      Text(
+                                        status == 'Scheduled' &&
+                                                _hasAppointmentPassed(
+                                                    appointment)
+                                            ? "Status: Scheduled (Overdue)"
+                                            : (status == 'Scheduled'
+                                                ? "Scheduled"
+                                                : status),
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: status == 'Scheduled' &&
+                                                  _hasAppointmentPassed(
+                                                      appointment)
+                                              ? Colors.orange.shade800
+                                              : Colors.grey.shade600,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                if (isNext)
+                                  Container(
+                                    padding: EdgeInsets.symmetric(
+                                        horizontal: 8, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color:
+                                          const Color(0xFF6A9C89), // Sage Green
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Text(
+                                      "Next",
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
                           ),
-                        ),
-                      );
-                    },
-                  ),
-          ),
-        ],
-      ),
-    );
+                        );
+                      },
+                    ),
+            ),
+          ],
+        ),
+      );
+    });
   }
 
   // 3. Quick Action Buttons
@@ -930,7 +931,7 @@ class _DoctorHomePageState extends State<DoctorHomePage> {
                     ),
                   ],
                 ),
-               ],
+              ],
             ),
           ),
         ],

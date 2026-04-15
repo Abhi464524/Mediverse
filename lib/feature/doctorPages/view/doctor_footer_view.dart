@@ -9,13 +9,15 @@ import 'doctor_homepage_view.dart';
 import 'emergency_appointments_view.dart';
 
 class DoctorFooter extends StatefulWidget {
-  const DoctorFooter({super.key});
+  final int? selectedIndex;
+  const DoctorFooter({super.key, this.selectedIndex});
 
   @override
   State<DoctorFooter> createState() => _DoctorFooterState();
 }
 
 class _DoctorFooterState extends State<DoctorFooter> {
+  // ... (keep _getDoctorProfile as is)
   Future<Map<String, String>> _getDoctorProfile() async {
     try {
       StorageService storage = await StorageService.getInstance();
@@ -33,65 +35,79 @@ class _DoctorFooterState extends State<DoctorFooter> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: EdgeInsets.all(8),
+      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
       decoration: BoxDecoration(
         color: AppColors.primarySurface,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, -4),
+          ),
+        ],
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-          IconButton(
-            onPressed: () async {
+      child: SafeArea(
+        top: false,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: [
+            _buildNavItem(0, Icons.home, "Home", () async {
               final profile = await _getDoctorProfile();
               Get.offAll(() => DoctorHomePage(
-                name: profile['name']!,
-                speciality: profile['speciality'],
-              ));
-            },
-            icon: Icon(
-              Icons.home,
-              size: 30,
-              color: AppColors.primary,
-            ),
-          ),
-          IconButton(
-            onPressed: () {
+                    name: profile['name']!,
+                    speciality: profile['speciality'],
+                  ));
+            }),
+            _buildNavItem(1, Icons.receipt_long, "Rx", () {
               Get.to(() => const DigitalPrescriptionView());
-            },
-            icon: const Icon(
-              Icons.receipt_long,
-              size: 30,
-              color: AppColors.primary,
-            ),
-          ),
-          IconButton(
-            onPressed: () {},
-            icon: Icon(
-              Icons.message_outlined,
-              size: 30,
-              color: AppColors.primary,
-            ),
-          ),
-          IconButton(
-            onPressed: () {
+            }),
+            _buildNavItem(2, Icons.message_outlined, "Chat", () {}),
+            _buildNavItem(3, Icons.emergency, "Emergency", () {
               Get.to(() => const EmergencyAppointmentsPage());
-            },
-            icon: const Icon(
-              Icons.emergency,
-              size: 30,
-              color: AppColors.emergency,
-            ),
-          ),
-          IconButton(
-            onPressed: () {
+            }, isEmergency: true),
+            _buildNavItem(4, Icons.people_alt_rounded, "Patients", () {
               Get.to(() => AppointmentsPage());
-            },
-            icon: Icon(
-              Icons.people_alt_rounded,
-              size: 30,
-              color: AppColors.primary,
+            }),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNavItem(int index, IconData icon, String label, VoidCallback onTap,
+      {bool isEmergency = false}) {
+    final isSelected = widget.selectedIndex == index;
+    final activeColor = isEmergency ? AppColors.emergency : AppColors.primary;
+    final inactiveColor = Colors.grey.shade400;
+
+    return InkWell(
+      onTap: onTap,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: BoxDecoration(
+              color: isSelected ? activeColor.withOpacity(0.1) : Colors.transparent,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(
+              icon,
+              size: 28,
+              color: isSelected ? activeColor : inactiveColor,
             ),
           ),
+          const SizedBox(height: 4),
+          if (isSelected)
+            Container(
+              width: 4,
+              height: 4,
+              decoration: BoxDecoration(
+                color: activeColor,
+                shape: BoxShape.circle,
+              ),
+            ),
         ],
       ),
     );

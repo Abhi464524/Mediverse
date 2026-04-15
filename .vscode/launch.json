@@ -22,7 +22,7 @@
       "type": "dart",
       "program": "lib/main.dart",
       "toolArgs": [
-        "--dart-define=API_BASE_URL=http://10.10.81.218:3000/api"
+        "--dart-define=API_BASE_URL=http://10.10.81.218:3500"
       ]
     }
   ]

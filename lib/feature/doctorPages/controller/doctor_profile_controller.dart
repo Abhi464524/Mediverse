@@ -1,9 +1,9 @@
 import 'package:get/get.dart';
 import 'package:mediverse/feature/doctorPages/model/doctor_profile_model.dart';
-import 'package:mediverse/feature/doctorPages/repo/doctor_repo.dart';
+import 'package:mediverse/feature/doctorPages/repo/doctor_profile_repo.dart';
 
 class DoctorProfileController extends GetxController {
-  final DoctorRepo _doctorRepo = DoctorRepo();
+  final DoctorProfileRepo _doctorRepo = DoctorProfileRepo();
   
   final RxBool isSaving = false.obs;
   final RxBool isLoading = false.obs;

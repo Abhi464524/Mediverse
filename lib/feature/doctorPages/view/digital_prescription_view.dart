@@ -4,7 +4,24 @@ import 'package:get/get.dart';
 import 'doctor_footer_view.dart';
 
 class DigitalPrescriptionView extends StatefulWidget {
-  const DigitalPrescriptionView({super.key});
+  final String? patientId;
+  final String? appointmentId;
+  final String? initialPatientName;
+  final String? initialAge;
+  final String? initialGender;
+  final String? initialSymptoms;
+  final String? initialDiagnosis;
+
+  const DigitalPrescriptionView({
+    super.key,
+    this.patientId,
+    this.appointmentId,
+    this.initialPatientName,
+    this.initialAge,
+    this.initialGender,
+    this.initialSymptoms,
+    this.initialDiagnosis,
+  });
 
   @override
   State<DigitalPrescriptionView> createState() =>
@@ -19,7 +36,20 @@ class _DigitalPrescriptionViewState extends State<DigitalPrescriptionView> {
   final TextEditingController _medicinesController = TextEditingController();
   final TextEditingController _notesController = TextEditingController();
 
-  String _selectedGender = 'Male';
+  late String _selectedGender;
+
+  @override
+  void initState() {
+    super.initState();
+    _patientNameController.text = widget.initialPatientName ?? '';
+    _ageController.text = widget.initialAge ?? '';
+    _selectedGender = (widget.initialGender != null && widget.initialGender!.isNotEmpty) ? widget.initialGender! : 'Male';
+    if (!['Male', 'Female', 'Other'].contains(_selectedGender)) {
+      _selectedGender = 'Male';
+    }
+    _symptomsController.text = widget.initialSymptoms ?? '';
+    _diagnosisController.text = widget.initialDiagnosis ?? '';
+  }
 
   void _applyTemplate(String templateName) {
     setState(() {
@@ -177,7 +207,7 @@ class _DigitalPrescriptionViewState extends State<DigitalPrescriptionView> {
           ],
         ),
       ),
-      bottomSheet: const DoctorFooter(),
+      bottomSheet: const DoctorFooter(selectedIndex: 1),
     );
   }
 

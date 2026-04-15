@@ -1,7 +1,10 @@
 import 'package:mediverse/feature/doctorPages/model/patient_model.dart';
 import 'package:mediverse/feature/doctorPages/model/appointment_model.dart';
+import 'package:mediverse/feature/doctorPages/view/edit_patient_details_view.dart';
+import 'package:mediverse/feature/doctorPages/view/digital_prescription_view.dart';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:get/get.dart';
 import 'package:open_filex/open_filex.dart';
 import '../../../common/services/storage_service.dart';
 import '../../../common/utils/phone_launcher.dart' show launchCallWithLoader;
@@ -21,340 +24,92 @@ class PatientDetails extends StatefulWidget {
 }
 
 class _PatientDetailsState extends State<PatientDetails> {
-  String notes = "";
-  TextEditingController? _notesController;
   late String _selectedStatus;
 
-  /// Whether this patient came from an emergency appointment.
   bool get _isEmergency =>
       (widget.patient.appointment?.symptoms ?? '')
           .toLowerCase()
           .contains('emergency');
 
-  // Emergency color palette
   Color get _accentColor =>
       _isEmergency ? const Color(0xFFE53935) : const Color(0xFF6A9C89);
   Color get _accentLight =>
       _isEmergency ? const Color(0xFFFFCDD2) : const Color(0xFFC4DAD2);
   Color get _accentBg =>
       _isEmergency ? const Color(0xFFFFF5F5) : const Color(0xFFF8FBF9);
-  List<String> _savedNotes = <String>[];
-  List<Map<String, String>> _attachments = <Map<String, String>>[];
 
-  // Editable fields controllers
-  late TextEditingController _phoneController;
-  late TextEditingController _emailController;
-  late TextEditingController _addressController;
-  late TextEditingController _medicalHistoryController;
-  late TextEditingController _currentMedicationsController;
-  late TextEditingController _allergiesController;
-  late TextEditingController _lastVisitController;
-  late TextEditingController _appointmentTimeController;
-  late TextEditingController _symptomsController;
-  late TextEditingController _diagnosisController;
+  List<Map<String, String>> _attachments = [];
+
+  // Local overrides loaded from storage (set by the Edit page)
+  Map<String, String?> _persisted = {};
+
   static const String _hardcodedPhoneNumber = "+91 7900464524";
 
-  TextEditingController get notesController {
-    _notesController ??= TextEditingController();
-    return _notesController!;
-  }
+
+
+  // ── helpers ──────────────────────────────────────────────────────────
+  String _val(String? stored, String? modelVal) =>
+      (stored != null && stored.isNotEmpty) ? stored : (modelVal ?? '—');
 
   Future<void> _callHardcodedNumber() async {
     await launchCallWithLoader(context, _hardcodedPhoneNumber);
   }
 
-  Widget _buildStatusCard() {
-    bool hasPassed = _hasAppointmentPassed;
-    List<String> options = ['Scheduled', 'Done', 'Not Visited'];
-
-    return Container(
-      padding: EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.05),
-            blurRadius: 10,
-            offset: Offset(0, 4),
-          )
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.check_circle_outline,
-                  color: _accentColor, size: 20),
-              SizedBox(width: 8),
-              Text(
-                "Appointment Status",
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black87,
-                  fontFamily: 'Poppins',
-                ),
-              ),
-              if (hasPassed && _selectedStatus == 'Scheduled')
-                Padding(
-                  padding: const EdgeInsets.only(left: 8.0),
-                  child: Icon(Icons.warning_amber_rounded,
-                      color: Colors.orange, size: 16),
-                ),
-            ],
-          ),
-          SizedBox(height: 16),
-          Wrap(
-            spacing: 8,
-            children: options.map((status) {
-              bool isSelected = _selectedStatus == status;
-              Color activeColor = status == 'Done'
-                  ? _accentColor
-                  : (status == 'Not Visited'
-                      ? Colors.redAccent
-                      : _accentLight);
-
-              String label = status;
-              if (status == 'Scheduled' && hasPassed) {
-                label = "Scheduled (Action Required)";
-              }
-
-              return ChoiceChip(
-                label: Text(label),
-                selected: isSelected,
-                onSelected: (selected) {
-                  if (selected) {
-                    setState(() => _selectedStatus = status);
-                    if (widget.appointment != null) {
-                      StorageService.getInstance().then(
-                        (storage) => storage.saveAppointmentStatus(
-                          widget.appointment!.id,
-                          status,
-                        ),
-                      );
-                    }
-                  }
-                },
-                selectedColor: activeColor.withOpacity(0.2),
-                labelStyle: TextStyle(
-                  color: isSelected ? activeColor : Colors.grey,
-                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                  fontFamily: 'Poppins',
-                ),
-                backgroundColor: Colors.grey.shade100,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  side: BorderSide(
-                    color: isSelected ? activeColor : Colors.transparent,
-                  ),
-                ),
-              );
-            }).toList(),
-          ),
-          if (hasPassed && _selectedStatus == 'Scheduled')
-            Padding(
-              padding: const EdgeInsets.only(top: 8.0),
-              child: Text(
-                "Appointment time has passed. Please update status.",
-                style: TextStyle(
-                    color: Colors.orange.shade800,
-                    fontSize: 11,
-                    fontFamily: 'Poppins'),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
+  // ── lifecycle ────────────────────────────────────────────────────────
   @override
   void initState() {
     super.initState();
-    _notesController = TextEditingController();
     String initialStatus = widget.appointment?.status ?? 'Scheduled';
     if (initialStatus == 'Pending') initialStatus = 'Scheduled';
     _selectedStatus = initialStatus;
 
-    // Initialize editable controllers from the current patient/appointment data
-    _phoneController = TextEditingController(text: widget.patient.contact?.phone ?? "");
-    _emailController = TextEditingController(text: widget.patient.contact?.email ?? "");
-    _addressController = TextEditingController(text: widget.patient.contact?.address ?? "");
-    _medicalHistoryController =
-        TextEditingController(text: widget.patient.medicalHistory?.historyNotes ?? "");
-    _currentMedicationsController =
-        TextEditingController(text: widget.patient.medicalHistory?.currentMedications ?? "");
-    _allergiesController =
-        TextEditingController(text: widget.patient.medicalHistory?.allergies ?? "");
-    _lastVisitController =
-        TextEditingController(text: widget.patient.medicalHistory?.lastVisitDate ?? "");
-    _appointmentTimeController =
-        TextEditingController(text: _formatTimeWithDay(widget.patient.appointment?.scheduledTime ?? "N/A"));
-    _symptomsController = TextEditingController(text: widget.patient.appointment?.symptoms ?? "");
-    _diagnosisController =
-        TextEditingController(text: widget.patient.appointment?.diagnosis ?? "");
-
-    // Now load any persisted values that override the defaults.
     _loadPersistedStatus();
-    _loadSavedNotes();
     _loadAttachments();
-    _loadEditableDetails();
+    _loadPersistedDetails();
   }
 
-  Future<void> _loadSavedNotes() async {
+  Future<void> _loadPersistedDetails() async {
     try {
       final storage = await StorageService.getInstance();
-      final notes = storage.getPatientNotes(widget.patient.patientId ?? "");
-      setState(() {
-        _savedNotes = notes;
-      });
-    } catch (_) {
-      // Ignore storage errors.
-    }
-  }
-
-  Future<void> _addNote() async {
-    final text = notesController.text.trim();
-    if (text.isEmpty) return;
-    try {
-      final storage = await StorageService.getInstance();
-      await storage.addPatientNote(widget.patient.patientId ?? "", text);
-      notesController.clear();
-      setState(() {
-        notes = "";
-      });
-      await _loadSavedNotes();
-    } catch (_) {
-      // Ignore storage errors.
-    }
-  }
-
-  Future<void> _loadEditableDetails() async {
-    try {
-      final storage = await StorageService.getInstance();
-      final details = storage.getPatientDetails(widget.patient.patientId ?? "");
-      if (details == null) return;
-      setState(() {
-        _phoneController.text = details['phone'] ?? _phoneController.text;
-        _emailController.text = details['email'] ?? _emailController.text;
-        _addressController.text = details['address'] ?? _addressController.text;
-        _medicalHistoryController.text =
-            details['medicalHistory'] ?? _medicalHistoryController.text;
-        _currentMedicationsController.text =
-            details['currentMedications'] ?? _currentMedicationsController.text;
-        _allergiesController.text =
-            details['allergies'] ?? _allergiesController.text;
-        _lastVisitController.text =
-            details['lastVisit'] ?? _lastVisitController.text;
-        _appointmentTimeController.text =
-            details['appointmentTime'] ?? _appointmentTimeController.text;
-        _symptomsController.text =
-            details['symptoms'] ?? _symptomsController.text;
-        _diagnosisController.text =
-            details['diagnosis'] ?? _diagnosisController.text;
-      });
-    } catch (_) {
-      // Ignore storage errors.
-    }
-  }
-
-  Future<void> _saveEditableDetails() async {
-    try {
-      final storage = await StorageService.getInstance();
-      final ok = await storage.savePatientDetails(widget.patient.patientId ?? "", {
-        'phone': _phoneController.text,
-        'email': _emailController.text,
-        'address': _addressController.text,
-        'medicalHistory': _medicalHistoryController.text,
-        'currentMedications': _currentMedicationsController.text,
-        'allergies': _allergiesController.text,
-        'lastVisit': _lastVisitController.text,
-        'appointmentTime': _appointmentTimeController.text,
-        'symptoms': _symptomsController.text,
-        'diagnosis': _diagnosisController.text,
-      });
-      if (!mounted) return;
-      if (ok) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Patient details saved")),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Failed to save details")),
-        );
+      final details =
+          storage.getPatientDetails(widget.patient.patientId ?? '');
+      if (details != null) {
+        setState(() => _persisted = details);
       }
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Error saving details: $e")),
-      );
-    }
+    } catch (_) {}
   }
+
+
 
   Future<void> _loadAttachments() async {
     try {
       final storage = await StorageService.getInstance();
-      final files = storage.getPatientFiles(widget.patient.patientId ?? "");
-      setState(() {
-        _attachments = files;
-      });
-    } catch (_) {
-      // Ignore errors.
-    }
+      final files =
+          storage.getPatientFiles(widget.patient.patientId ?? '');
+      setState(() => _attachments = files);
+    } catch (_) {}
   }
 
   Future<void> _pickAndUploadFile() async {
     try {
-      final result = await FilePicker.platform.pickFiles(
-        allowMultiple: false,
-      );
+      final result = await FilePicker.platform.pickFiles(allowMultiple: false);
       if (result == null || result.files.isEmpty) return;
       final file = result.files.first;
       final path = file.path;
       if (path == null) return;
-      final name = file.name;
 
       final storage = await StorageService.getInstance();
-      final ok = await storage.addPatientFile(widget.patient.patientId ?? "", name, path);
+      final ok = await storage.addPatientFile(
+          widget.patient.patientId ?? '', file.name, path);
       if (!ok) return;
       await _loadAttachments();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Report uploaded: $name")),
-      );
+          SnackBar(content: Text("Report uploaded: ${file.name}")));
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Failed to pick file: $e")),
-      );
-    }
-  }
-
-  String _formatNoteTimestamp(DateTime dt) {
-    final local = dt.toLocal();
-    final y = local.year.toString().padLeft(4, '0');
-    final m = local.month.toString().padLeft(2, '0');
-    final d = local.day.toString().padLeft(2, '0');
-    final hh = local.hour.toString().padLeft(2, '0');
-    final mm = local.minute.toString().padLeft(2, '0');
-    return "$y-$m-$d $hh:$mm";
-  }
-
-  ({String note, String? timestampLabel}) _parseStoredNote(String raw) {
-    // New format: "ISO_TIMESTAMP|note"
-    final idx = raw.indexOf('|');
-    if (idx <= 0 || idx == raw.length - 1) {
-      // Old format (no timestamp)
-      return (note: raw, timestampLabel: null);
-    }
-    final ts = raw.substring(0, idx);
-    final note = raw.substring(idx + 1);
-    try {
-      final dt = DateTime.parse(ts);
-      return (note: note, timestampLabel: _formatNoteTimestamp(dt));
-    } catch (_) {
-      return (note: note, timestampLabel: ts);
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text("Failed to pick file: $e")));
     }
   }
 
@@ -362,18 +117,17 @@ class _PatientDetailsState extends State<PatientDetails> {
     if (widget.appointment == null) return;
     try {
       final storage = await StorageService.getInstance();
-      final persisted = storage.getAppointmentStatus(widget.appointment!.id);
+      final persisted =
+          storage.getAppointmentStatus(widget.appointment!.id);
       if (persisted != null && persisted.isNotEmpty) {
         String status = persisted;
         if (status == 'Pending') status = 'Scheduled';
-        setState(() {
-          _selectedStatus = status;
-        });
+        setState(() => _selectedStatus = status);
       }
-    } catch (_) {
-      // Ignore storage errors; keep default status.
-    }
+    } catch (_) {}
   }
+
+
 
   DateTime _parseTime(String timeStr) {
     if (timeStr.isEmpty) return DateTime.now();
@@ -381,287 +135,130 @@ class _PatientDetailsState extends State<PatientDetails> {
     try {
       final parts = timeStr.trim().split(' ');
       if (parts.length < 2) return now;
-      final timeParts = parts[0].split(':');
-      int hour = int.parse(timeParts[0]);
-      int minute = int.parse(timeParts[1]);
+      final tp = parts[0].split(':');
+      int hour = int.parse(tp[0]);
+      int minute = int.parse(tp[1]);
       final amPm = parts[1].toUpperCase();
-
-      if (amPm == "PM" && hour != 12) hour += 12;
-      if (amPm == "AM" && hour == 12) hour = 0;
-
+      if (amPm == 'PM' && hour != 12) hour += 12;
+      if (amPm == 'AM' && hour == 12) hour = 0;
       return DateTime(now.year, now.month, now.day, hour, minute);
-    } catch (e) {
+    } catch (_) {
       return now;
     }
   }
 
-  String _formatTimeWithDay(String timeStr) {
-    if (timeStr.isEmpty || timeStr == 'N/A') return timeStr;
-    final parsed = _parseTime(timeStr);
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final diff = DateTime(parsed.year, parsed.month, parsed.day)
-        .difference(today)
-        .inDays;
-
-    String dayLabel;
-    if (diff == 0) {
-      dayLabel = 'Today';
-    } else if (diff == 1) {
-      dayLabel = 'Tomorrow';
-    } else if (diff == -1) {
-      dayLabel = 'Yesterday';
-    } else {
-      final dd = parsed.day.toString().padLeft(2, '0');
-      final mm = parsed.month.toString().padLeft(2, '0');
-      dayLabel = '$dd-$mm';
-    }
-    return '$dayLabel, $timeStr';
-  }
-
   bool get _hasAppointmentPassed {
     if (widget.appointment == null) return false;
-    final appTime = _parseTime(widget.appointment!.time);
-    // Adding 15 mins buffer or just compare strictly? Strict for now.
-    return DateTime.now().isAfter(appTime);
+    return DateTime.now().isAfter(_parseTime(widget.appointment!.time));
   }
 
   @override
   void dispose() {
-    _notesController?.dispose();
-    _phoneController.dispose();
-    _emailController.dispose();
-    _addressController.dispose();
-    _medicalHistoryController.dispose();
-    _currentMedicationsController.dispose();
-    _allergiesController.dispose();
-    _lastVisitController.dispose();
-    _appointmentTimeController.dispose();
-    _symptomsController.dispose();
-    _diagnosisController.dispose();
     super.dispose();
   }
 
+  // ── Navigate to edit page ─────────────────────────────────────────────
+  Future<void> _openEditPage() async {
+    final result = await Get.to(() => EditPatientDetailsPage(
+          patient: widget.patient,
+          appointment: widget.appointment,
+        ));
+    if (result == true) {
+      // Refresh persisted details after successful save
+      await _loadPersistedDetails();
+    }
+  }
+
+  // ── Build ─────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: _accentBg, // Pale Mint
+      backgroundColor: _accentBg,
       appBar: AppBar(
         title: Text(
-          _isEmergency ? "Emergency Patient Details" : "Patient Details",
-          style: TextStyle(
-              color: Colors.black,
-              fontWeight: FontWeight.bold,
-              fontFamily: 'Poppins'),
+          _isEmergency ? 'Emergency Patient' : 'Patient Details',
+          style: const TextStyle(
+            color: Colors.black87,
+            fontWeight: FontWeight.bold,
+            fontFamily: 'Poppins',
+          ),
         ),
         backgroundColor: Colors.transparent,
         elevation: 0,
         centerTitle: true,
-        iconTheme: IconThemeData(color: Colors.black),
+        iconTheme: const IconThemeData(color: Colors.black87),
+        actions: [
+          IconButton(
+            tooltip: 'Edit Details',
+            icon: Icon(Icons.edit_outlined, color: _accentColor),
+            onPressed: _openEditPage,
+          ),
+        ],
       ),
       extendBodyBehindAppBar: true,
       body: SingleChildScrollView(
         child: Column(
           children: [
-            SizedBox(height: 100), // Space for extended AppBar
-            _buildEnhancedHeader(),
+            const SizedBox(height: 100),
+            _buildHeader(),
             Padding(
-              padding: const EdgeInsets.all(20.0),
+              padding: const EdgeInsets.all(20),
               child: Column(
                 children: [
                   if (widget.appointment != null) ...[
                     _buildStatusCard(),
-                    SizedBox(height: 24),
+                    const SizedBox(height: 24),
                   ],
                   _buildQuickStatsGrid(),
-                  SizedBox(height: 24),
-                  _buildSectionCard(
-                    title: "Contact Information",
+                  const SizedBox(height: 24),
+                  _buildReadOnlySection(
+                    title: 'Contact Information',
                     icon: Icons.contact_mail_outlined,
-                    children: [
-                      _buildEditableInfoRow(
-                          Icons.phone, "Phone", _phoneController),
-                      _buildEditableInfoRow(
-                          Icons.email, "Email", _emailController),
-                      _buildEditableInfoRow(
-                          Icons.location_on, "Address", _addressController),
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: TextButton.icon(
-                          onPressed: _saveEditableDetails,
-                          icon: Icon(
-                            Icons.save,
-                            size: 18,
-                            color: _accentColor,
-                          ),
-                          label: Text(
-                            "Save Details",
-                            style: TextStyle(
-                              color: _accentColor,
-                              fontFamily: 'Poppins',
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                      ),
+                    rows: [
+                      _InfoRow(Icons.phone_outlined, 'Phone',
+                          _val(_persisted['phone'], widget.patient.contact?.phone)),
+                      _InfoRow(Icons.email_outlined, 'Email',
+                          _val(_persisted['email'], widget.patient.contact?.email)),
+                      _InfoRow(Icons.location_on_outlined, 'Address',
+                          _val(_persisted['address'], widget.patient.contact?.address)),
                     ],
                   ),
-                  SizedBox(height: 20),
-                  _buildSectionCard(
-                    title: "Medical Overview",
+                  const SizedBox(height: 20),
+                  _buildReadOnlySection(
+                    title: 'Medical History',
                     icon: Icons.medical_services_outlined,
-                    children: [
-                      _buildEditableInfoRow(Icons.history, "Medical History",
-                          _medicalHistoryController),
-                      _buildEditableInfoRow(Icons.medication,
-                          "Current Medications", _currentMedicationsController),
-                      _buildEditableInfoRow(Icons.warning_amber_rounded,
-                          "Allergies", _allergiesController),
-                      _buildEditableInfoRow(Icons.calendar_today, "Last Visit",
-                          _lastVisitController),
-                      SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Icon(Icons.attach_file,
-                              size: 18, color: _accentColor),
-                          SizedBox(width: 8),
-                          Text(
-                            "Reports / Attachments",
-                            style: TextStyle(
-                              fontFamily: 'Poppins',
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.black87,
-                            ),
-                          ),
-                          Spacer(),
-                          TextButton.icon(
-                            onPressed: _pickAndUploadFile,
-                            icon: Icon(Icons.cloud_upload,
-                                size: 18, color: _accentColor),
-                            label: Text(
-                              "Upload",
-                              style: TextStyle(
-                                color: _accentColor,
-                                fontFamily: 'Poppins',
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      if (_attachments.isNotEmpty) ...[
-                        SizedBox(height: 12),
-                        Divider(
-                          height: 1,
-                          thickness: 1,
-                          color: _accentLight.withOpacity(0.7),
-                        ),
-                        ListView.separated(
-                          shrinkWrap: true,
-                          physics: NeverScrollableScrollPhysics(),
-                          padding: EdgeInsets.zero,
-                          itemCount: _attachments.length,
-                          separatorBuilder: (_, __) => Divider(
-                            height: 8,
-                            color: _accentLight.withOpacity(0.5),
-                          ),
-                          itemBuilder: (context, index) {
-                            final file = _attachments[index];
-                            final name = file['name'] ?? '';
-                            final ts = file['ts'] ?? '';
-                            final path = file['path'] ?? '';
-                            return ListTile(
-                              contentPadding: EdgeInsets.zero,
-                              dense: true,
-                              leading: Icon(
-                                name.toLowerCase().endsWith('.pdf')
-                                    ? Icons.picture_as_pdf
-                                    : Icons.insert_drive_file,
-                                size: 20,
-                                color: _accentColor,
-                              ),
-                              title: Text(
-                                name,
-                                style: TextStyle(
-                                  fontFamily: 'Poppins',
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                              subtitle: ts.isNotEmpty
-                                  ? Text(
-                                      ts,
-                                      style: TextStyle(
-                                        fontFamily: 'Poppins',
-                                        fontSize: 11,
-                                        color: Colors.grey.shade600,
-                                      ),
-                                    )
-                                  : null,
-                              onTap: path.isNotEmpty
-                                  ? () => OpenFilex.open(path)
-                                  : null,
-                            );
-                          },
-                        ),
-                      ],
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: TextButton.icon(
-                          onPressed: _saveEditableDetails,
-                          icon: Icon(
-                            Icons.save,
-                            size: 18,
-                            color: _accentColor,
-                          ),
-                          label: Text(
-                            "Save Details",
-                            style: TextStyle(
-                              color: _accentColor,
-                              fontFamily: 'Poppins',
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                      ),
+                    rows: [
+                      _InfoRow(Icons.history_outlined, 'History Notes',
+                          _val(_persisted['medicalHistory'],
+                              widget.patient.medicalHistory?.historyNotes)),
+                      _InfoRow(Icons.medication_outlined, 'Current Medications',
+                          _val(_persisted['currentMedications'],
+                              widget.patient.medicalHistory?.currentMedications)),
+                      _InfoRow(Icons.warning_amber_outlined, 'Allergies',
+                          _val(_persisted['allergies'],
+                              widget.patient.medicalHistory?.allergies)),
+                      _InfoRow(Icons.calendar_today_outlined, 'Last Visit',
+                          _val(_persisted['lastVisit'],
+                              widget.patient.medicalHistory?.lastVisitDate)),
                     ],
+                    footer: _buildAttachmentsSection(),
                   ),
-                  SizedBox(height: 20),
-                  _buildSectionCard(
-                    title: "Current Visit",
+                  const SizedBox(height: 20),
+                  _buildReadOnlySection(
+                    title: 'Current Visit',
                     icon: Icons.local_hospital_outlined,
-                    children: [
-                      _buildEditableInfoRow(Icons.access_time,
-                          "Appointment Time", _appointmentTimeController),
-                      _buildEditableInfoRow(
-                          Icons.sick_outlined, "Symptoms", _symptomsController),
-                      _buildEditableInfoRow(Icons.monitor_heart_outlined,
-                          "Diagnosis", _diagnosisController),
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: TextButton.icon(
-                          onPressed: _saveEditableDetails,
-                          icon: Icon(
-                            Icons.save,
-                            size: 18,
-                            color: _accentColor,
-                          ),
-                          label: Text(
-                            "Save Details",
-                            style: TextStyle(
-                              color: _accentColor,
-                              fontFamily: 'Poppins',
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                      ),
+                    rows: [
+                      _InfoRow(Icons.sick_outlined, 'Symptoms',
+                          _val(_persisted['symptoms'],
+                              widget.patient.appointment?.symptoms)),
+                      _InfoRow(Icons.monitor_heart_outlined, 'Diagnosis',
+                          _val(_persisted['diagnosis'],
+                              widget.patient.appointment?.diagnosis)),
                     ],
                   ),
-                  SizedBox(height: 20),
-                  _buildDoctorNotes(),
-                  SizedBox(height: 100), // Space for bottom buttons
+                  const SizedBox(height: 20),
+                  _buildDigitalPrescriptionBox(),
+                  const SizedBox(height: 100),
                 ],
               ),
             ),
@@ -672,59 +269,61 @@ class _PatientDetailsState extends State<PatientDetails> {
     );
   }
 
-  Widget _buildEnhancedHeader() {
+  // ── Section Widgets ───────────────────────────────────────────────────
+
+  Widget _buildHeader() {
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
-        color: _accentLight.withOpacity(0.3), // Soft Sage Light
-        borderRadius: BorderRadius.only(
+        color: _accentLight.withOpacity(0.3),
+        borderRadius: const BorderRadius.only(
           bottomLeft: Radius.circular(40),
           bottomRight: Radius.circular(40),
         ),
       ),
-      padding: EdgeInsets.fromLTRB(20, 20, 20, 40),
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 40),
       child: Column(
         children: [
           Container(
-            padding: EdgeInsets.all(4),
+            padding: const EdgeInsets.all(4),
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               color: Colors.white,
               boxShadow: [
                 BoxShadow(
-                  color: _accentColor
-                      .withOpacity(0.2), // Sage Green Shadow
+                  color: _accentColor.withOpacity(0.2),
                   blurRadius: 15,
-                  offset: Offset(0, 5),
-                )
+                  offset: const Offset(0, 5),
+                ),
               ],
             ),
             child: CircleAvatar(
               radius: 50,
               backgroundColor: _accentLight,
-              child: Icon(Icons.person, size: 60, color: Colors.white),
+              child: const Icon(Icons.person, size: 60, color: Colors.white),
             ),
           ),
-          SizedBox(height: 16),
+          const SizedBox(height: 16),
           Text(
-            widget.patient.profile?.name ?? "Unknown",
-            style: TextStyle(
+            widget.patient.profile?.name ?? 'Unknown',
+            style: const TextStyle(
               fontSize: 26,
               fontWeight: FontWeight.bold,
               color: Colors.black87,
               fontFamily: 'Poppins',
             ),
           ),
-          SizedBox(height: 8),
+          const SizedBox(height: 8),
           Container(
-            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
             decoration: BoxDecoration(
-              color: _accentColor, // Sage Green
+              color: _accentColor,
               borderRadius: BorderRadius.circular(20),
             ),
             child: Text(
-              widget.patient.appointment?.diagnosis ?? "No diagnosis",
-              style: TextStyle(
+              _val(_persisted['diagnosis'],
+                  widget.patient.appointment?.diagnosis),
+              style: const TextStyle(
                 color: Colors.white,
                 fontWeight: FontWeight.w600,
                 fontSize: 14,
@@ -737,15 +336,114 @@ class _PatientDetailsState extends State<PatientDetails> {
     );
   }
 
+  Widget _buildStatusCard() {
+    final bool hasPassed = _hasAppointmentPassed;
+    final options = ['Scheduled', 'Done', 'Not Visited'];
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.check_circle_outline, color: _accentColor, size: 20),
+              const SizedBox(width: 8),
+              const Text(
+                'Appointment Status',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
+                  fontFamily: 'Poppins',
+                ),
+              ),
+              if (hasPassed && _selectedStatus == 'Scheduled')
+                Padding(
+                  padding: const EdgeInsets.only(left: 8),
+                  child: Icon(Icons.warning_amber_rounded,
+                      color: Colors.orange, size: 16),
+                ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 8,
+            children: options.map((status) {
+              final isSelected = _selectedStatus == status;
+              final Color activeColor = status == 'Done'
+                  ? _accentColor
+                  : (status == 'Not Visited' ? Colors.redAccent : _accentLight);
+              final String label = (status == 'Scheduled' && hasPassed)
+                  ? 'Scheduled (Action Required)'
+                  : status;
+              return ChoiceChip(
+                label: Text(label),
+                selected: isSelected,
+                onSelected: (selected) {
+                  if (selected) {
+                    setState(() => _selectedStatus = status);
+                    if (widget.appointment != null) {
+                      StorageService.getInstance().then((s) =>
+                          s.saveAppointmentStatus(
+                              widget.appointment!.id, status));
+                    }
+                  }
+                },
+                selectedColor: activeColor.withOpacity(0.2),
+                labelStyle: TextStyle(
+                  color: isSelected ? activeColor : Colors.grey,
+                  fontWeight:
+                      isSelected ? FontWeight.bold : FontWeight.normal,
+                  fontFamily: 'Poppins',
+                ),
+                backgroundColor: Colors.grey.shade100,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: BorderSide(
+                      color: isSelected ? activeColor : Colors.transparent),
+                ),
+              );
+            }).toList(),
+          ),
+          if (hasPassed && _selectedStatus == 'Scheduled')
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(
+                'Appointment time has passed. Please update status.',
+                style: TextStyle(
+                  color: Colors.orange.shade800,
+                  fontSize: 11,
+                  fontFamily: 'Poppins',
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildQuickStatsGrid() {
     return Row(
       children: [
-        _buildStatCard("Age", widget.patient.profile?.age ?? "N/A", Icons.cake),
-        SizedBox(width: 12),
-        _buildStatCard("Blood", widget.patient.profile?.bloodGroup ?? "N/A", Icons.bloodtype),
-        SizedBox(width: 12),
+        _buildStatCard('Age', widget.patient.profile?.age ?? 'N/A', Icons.cake),
+        const SizedBox(width: 12),
         _buildStatCard(
-            "Gender", widget.patient.profile?.gender ?? "N/A", Icons.male), // Simplified icon
+            'Blood', widget.patient.profile?.bloodGroup ?? 'N/A', Icons.bloodtype),
+        const SizedBox(width: 12),
+        _buildStatCard(
+            'Gender', widget.patient.profile?.gender ?? 'N/A', Icons.male),
       ],
     );
   }
@@ -753,7 +451,7 @@ class _PatientDetailsState extends State<PatientDetails> {
   Widget _buildStatCard(String label, String value, IconData icon) {
     return Expanded(
       child: Container(
-        padding: EdgeInsets.symmetric(vertical: 16),
+        padding: const EdgeInsets.symmetric(vertical: 16),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
@@ -762,17 +460,17 @@ class _PatientDetailsState extends State<PatientDetails> {
             BoxShadow(
               color: Colors.grey.withOpacity(0.05),
               blurRadius: 10,
-              offset: Offset(0, 4),
-            )
+              offset: const Offset(0, 4),
+            ),
           ],
         ),
         child: Column(
           children: [
             Icon(icon, color: _accentColor, size: 24),
-            SizedBox(height: 8),
+            const SizedBox(height: 8),
             Text(
               value,
-              style: TextStyle(
+              style: const TextStyle(
                 fontWeight: FontWeight.bold,
                 fontSize: 16,
                 color: Colors.black87,
@@ -793,12 +491,14 @@ class _PatientDetailsState extends State<PatientDetails> {
     );
   }
 
-  Widget _buildSectionCard(
-      {required String title,
-      required IconData icon,
-      required List<Widget> children}) {
+  Widget _buildReadOnlySection({
+    required String title,
+    required IconData icon,
+    required List<_InfoRow> rows,
+    Widget? footer,
+  }) {
     return Container(
-      padding: EdgeInsets.all(20),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
@@ -806,44 +506,45 @@ class _PatientDetailsState extends State<PatientDetails> {
           BoxShadow(
             color: Colors.grey.withOpacity(0.05),
             blurRadius: 10,
-            offset: Offset(0, 4),
-          )
+            offset: const Offset(0, 4),
+          ),
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Icon(icon, color: _accentColor, size: 20),
-              SizedBox(width: 8),
-              Text(
-                title,
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black87,
-                  fontFamily: 'Poppins',
-                ),
+          Row(children: [
+            Icon(icon, color: _accentColor, size: 20),
+            const SizedBox(width: 8),
+            Text(
+              title,
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Colors.black87,
+                fontFamily: 'Poppins',
               ),
-            ],
-          ),
-          Divider(height: 24, color: const Color(0xFFF2F7F5)),
-          ...children,
+            ),
+          ]),
+          Divider(height: 24, color: _accentLight.withOpacity(0.5)),
+          ...rows.map((r) => _buildInfoRow(r.icon, r.label, r.value)),
+          if (footer != null) ...[
+            const SizedBox(height: 4),
+            footer,
+          ],
         ],
       ),
     );
   }
 
-  Widget _buildEditableInfoRow(
-      IconData icon, String label, TextEditingController controller) {
+  Widget _buildInfoRow(IconData icon, String label, String value) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12.0),
+      padding: const EdgeInsets.only(bottom: 16),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Icon(icon, size: 18, color: Colors.grey.shade400),
-          SizedBox(width: 12),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -852,34 +553,18 @@ class _PatientDetailsState extends State<PatientDetails> {
                   label,
                   style: TextStyle(
                     fontSize: 12,
-                    color: Colors.grey.shade600,
+                    color: Colors.grey.shade500,
                     fontFamily: 'Poppins',
                   ),
                 ),
-                TextField(
-                  controller: controller,
-                  style: TextStyle(
+                const SizedBox(height: 2),
+                Text(
+                  value.isEmpty ? '—' : value,
+                  style: const TextStyle(
                     fontSize: 14,
                     color: Colors.black87,
                     fontWeight: FontWeight.w500,
                     fontFamily: 'Poppins',
-                  ),
-                  decoration: InputDecoration(
-                    isDense: true,
-                    contentPadding:
-                        const EdgeInsets.symmetric(vertical: 4, horizontal: 0),
-                    border: UnderlineInputBorder(
-                      borderSide:
-                          BorderSide(color: Colors.grey.shade300, width: 1),
-                    ),
-                    enabledBorder: UnderlineInputBorder(
-                      borderSide:
-                          BorderSide(color: Colors.grey.shade300, width: 1),
-                    ),
-                    focusedBorder: UnderlineInputBorder(
-                      borderSide: BorderSide(
-                          color: _accentColor, width: 1.5),
-                    ),
                   ),
                 ),
               ],
@@ -890,9 +575,87 @@ class _PatientDetailsState extends State<PatientDetails> {
     );
   }
 
-  Widget _buildDoctorNotes() {
+  Widget _buildAttachmentsSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(Icons.attach_file, size: 18, color: _accentColor),
+            const SizedBox(width: 8),
+            const Text(
+              'Reports / Attachments',
+              style: TextStyle(
+                fontFamily: 'Poppins',
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: Colors.black87,
+              ),
+            ),
+            const Spacer(),
+            TextButton.icon(
+              onPressed: _pickAndUploadFile,
+              icon: Icon(Icons.cloud_upload, size: 18, color: _accentColor),
+              label: Text(
+                'Upload',
+                style: TextStyle(
+                  color: _accentColor,
+                  fontFamily: 'Poppins',
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+        if (_attachments.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Divider(height: 1, color: _accentLight.withOpacity(0.7)),
+          ListView.separated(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            padding: EdgeInsets.zero,
+            itemCount: _attachments.length,
+            separatorBuilder: (_, __) =>
+                Divider(height: 8, color: _accentLight.withOpacity(0.5)),
+            itemBuilder: (ctx, i) {
+              final file = _attachments[i];
+              final name = file['name'] ?? '';
+              final ts = file['ts'] ?? '';
+              final path = file['path'] ?? '';
+              return ListTile(
+                contentPadding: EdgeInsets.zero,
+                dense: true,
+                leading: Icon(
+                  name.toLowerCase().endsWith('.pdf')
+                      ? Icons.picture_as_pdf
+                      : Icons.insert_drive_file,
+                  size: 20,
+                  color: _accentColor,
+                ),
+                title: Text(name,
+                    style: const TextStyle(
+                        fontFamily: 'Poppins',
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500)),
+                subtitle: ts.isNotEmpty
+                    ? Text(ts,
+                        style: TextStyle(
+                            fontFamily: 'Poppins',
+                            fontSize: 11,
+                            color: Colors.grey.shade600))
+                    : null,
+                onTap: path.isNotEmpty ? () => OpenFilex.open(path) : null,
+              );
+            },
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildDigitalPrescriptionBox() {
     return Container(
-      padding: EdgeInsets.all(20),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
@@ -900,8 +663,8 @@ class _PatientDetailsState extends State<PatientDetails> {
           BoxShadow(
             color: Colors.grey.withOpacity(0.05),
             blurRadius: 10,
-            offset: Offset(0, 4),
-          )
+            offset: const Offset(0, 4),
+          ),
         ],
       ),
       child: Column(
@@ -909,10 +672,10 @@ class _PatientDetailsState extends State<PatientDetails> {
         children: [
           Row(
             children: [
-              Icon(Icons.edit_note, color: _accentColor, size: 24),
-              SizedBox(width: 8),
-              Text(
-                "Doctor's Notes",
+              Icon(Icons.picture_as_pdf_outlined, color: _accentColor, size: 24),
+              const SizedBox(width: 8),
+              const Text(
+                "Digital Prescription",
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
@@ -920,89 +683,49 @@ class _PatientDetailsState extends State<PatientDetails> {
                   fontFamily: 'Poppins',
                 ),
               ),
-              Spacer(),
-              TextButton.icon(
-                onPressed: _addNote,
-                icon:
-                    Icon(Icons.save, color: _accentColor, size: 18),
-                label: Text(
-                  "Add",
-                  style: TextStyle(
-                    color: _accentColor,
-                    fontFamily: 'Poppins',
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
             ],
           ),
-          SizedBox(height: 16),
-          if (_savedNotes.isNotEmpty) ...[
-            Container(
-              decoration: BoxDecoration(
-                color: _accentBg,
-                borderRadius: BorderRadius.circular(12),
-                border:
-                    Border.all(color: _accentLight.withOpacity(0.5)),
-              ),
-              child: ListView.separated(
-                shrinkWrap: true,
-                physics: NeverScrollableScrollPhysics(),
-                padding: EdgeInsets.all(12),
-                itemCount: _savedNotes.length,
-                separatorBuilder: (_, __) => Divider(
-                  height: 12,
-                  color: _accentLight.withOpacity(0.4),
+          const SizedBox(height: 12),
+          Text(
+            "Generate or view the digital prescription for this patient's visit.",
+            style: TextStyle(
+              fontSize: 13,
+              color: Colors.grey.shade600,
+              fontFamily: 'Poppins',
+            ),
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: () {
+                Get.to(() => DigitalPrescriptionView(
+                  patientId: widget.patient.patientId,
+                  appointmentId: widget.appointment?.id,
+                  initialPatientName: _val(_persisted['name'], widget.patient.profile?.name ?? widget.appointment?.patientName),
+                  initialAge: _val(_persisted['age'], widget.patient.profile?.age),
+                  initialGender: _val(_persisted['gender'], widget.patient.profile?.gender),
+                  initialSymptoms: _val(_persisted['symptoms'], widget.patient.appointment?.symptoms),
+                  initialDiagnosis: _val(_persisted['diagnosis'], widget.patient.appointment?.diagnosis),
+                ));
+              },
+              icon: const Icon(Icons.file_open_rounded, size: 18, color: Colors.white),
+              label: const Text(
+                'Open Digital Rx',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontFamily: 'Poppins',
+                  fontWeight: FontWeight.w600,
                 ),
-                itemBuilder: (context, index) {
-                  final parsed = _parseStoredNote(_savedNotes[index]);
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      if (parsed.timestampLabel != null)
-                        Text(
-                          parsed.timestampLabel!,
-                          style: TextStyle(
-                            fontFamily: 'Poppins',
-                            fontSize: 11,
-                            color: Colors.grey.shade600,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      Text(
-                        "• ${parsed.note}",
-                        style: TextStyle(
-                          fontFamily: 'Poppins',
-                          fontSize: 13,
-                          color: Colors.black87,
-                        ),
-                      ),
-                    ],
-                  );
-                },
               ),
-            ),
-            SizedBox(height: 12),
-          ],
-          Container(
-            decoration: BoxDecoration(
-              color: _accentBg, // Pale Mint
-              borderRadius: BorderRadius.circular(12),
-              border:
-                  Border.all(color: _accentLight.withOpacity(0.5)),
-            ),
-            child: TextField(
-              controller: notesController,
-              maxLines: 4,
-              onChanged: (value) => setState(() => notes = value),
-              decoration: InputDecoration(
-                hintText: "Write a new note, then tap Add...",
-                hintStyle: TextStyle(
-                    color: Colors.grey.shade400, fontFamily: 'Poppins'),
-                border: InputBorder.none,
-                contentPadding: EdgeInsets.all(16),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _accentColor,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                elevation: 0,
               ),
-              style: TextStyle(fontFamily: 'Poppins'),
             ),
           ),
         ],
@@ -1012,16 +735,17 @@ class _PatientDetailsState extends State<PatientDetails> {
 
   Widget _buildBottomActions() {
     return Container(
-      padding: EdgeInsets.all(20),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius:
+            const BorderRadius.vertical(top: Radius.circular(24)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.05),
             blurRadius: 10,
-            offset: Offset(0, -5),
-          )
+            offset: const Offset(0, -5),
+          ),
         ],
       ),
       child: SafeArea(
@@ -1029,22 +753,22 @@ class _PatientDetailsState extends State<PatientDetails> {
           children: [
             Expanded(
               child: _buildActionButton(
-                "Call",
+                'Call',
                 Icons.call,
                 Colors.white,
-                _accentColor, // Sage Green
+                _accentColor,
                 _callHardcodedNumber,
               ),
             ),
-            SizedBox(width: 16),
+            const SizedBox(width: 16),
             Expanded(
               child: _buildActionButton(
-                "Message",
+                'Message',
                 Icons.message,
-                _accentColor, // Sage Green
+                _accentColor,
                 Colors.white,
                 () => ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text("Opening message..."))),
+                    const SnackBar(content: Text('Opening message...'))),
               ),
             ),
           ],
@@ -1068,7 +792,7 @@ class _PatientDetailsState extends State<PatientDetails> {
       ),
       style: ElevatedButton.styleFrom(
         backgroundColor: bgColor,
-        padding: EdgeInsets.symmetric(vertical: 16),
+        padding: const EdgeInsets.symmetric(vertical: 16),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
           side: bgColor == Colors.white
@@ -1079,4 +803,12 @@ class _PatientDetailsState extends State<PatientDetails> {
       ),
     );
   }
+}
+
+// ── Data class for table rows ─────────────────────────────────────────────
+class _InfoRow {
+  final IconData icon;
+  final String label;
+  final String value;
+  const _InfoRow(this.icon, this.label, this.value);
 }
