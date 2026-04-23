@@ -1,5 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'dart:io';
+import 'package:device_info_plus/device_info_plus.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:get/get.dart';
 import 'common/config/api_config.dart';
@@ -11,7 +13,24 @@ import 'common/translations.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Check if running on emulator or physical device
+  bool isPhysicalDevice = true;
+  DeviceInfoPlugin deviceInfo = DeviceInfoPlugin();
+  try {
+    if (Platform.isAndroid) {
+      AndroidDeviceInfo androidInfo = await deviceInfo.androidInfo;
+      isPhysicalDevice = androidInfo.isPhysicalDevice;
+    } else if (Platform.isIOS) {
+      IosDeviceInfo iosInfo = await deviceInfo.iosInfo;
+      isPhysicalDevice = iosInfo.isPhysicalDevice;
+    }
+  } catch (e) {
+    debugPrint('Error checking device info: $e');
+  }
+
   debugPrint('Mediverse compiled API base: ${ApiConfig.baseUrl}');
+  debugPrint('Running on physical device: $isPhysicalDevice');
   await Firebase.initializeApp();
   final storage = await StorageService.getInstance();
 
