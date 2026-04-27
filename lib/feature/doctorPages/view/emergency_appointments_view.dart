@@ -375,10 +375,24 @@ class _EmergencyAppointmentsPageState extends State<EmergencyAppointmentsPage> {
           ..sort((a, b) => _parseTime(a.time).compareTo(_parseTime(b.time)));
 
         if (listToShow.isEmpty) {
-          return Center(
-            child: Text(emptyMsg,
-                style:
-                    const TextStyle(fontFamily: 'Poppins', color: Colors.grey)),
+          return RefreshIndicator(
+            color: _kAccent,
+            onRefresh: _fetchEmergencyAppointments,
+            child: ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              children: [
+                SizedBox(height: MediaQuery.of(context).size.height * 0.2),
+                Center(
+                  child: Text(
+                    emptyMsg,
+                    style: const TextStyle(
+                      fontFamily: 'Poppins',
+                      color: Colors.grey,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           );
         }
 
@@ -402,6 +416,7 @@ class _EmergencyAppointmentsPageState extends State<EmergencyAppointmentsPage> {
             color: _kAccent,
             onRefresh: _fetchEmergencyAppointments,
             child: ListView.builder(
+              physics: const AlwaysScrollableScrollPhysics(),
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
               itemCount: listToShow.length,
               itemBuilder: (context, index) =>

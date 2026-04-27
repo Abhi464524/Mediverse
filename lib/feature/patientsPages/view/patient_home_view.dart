@@ -7,6 +7,7 @@ import 'package:mediverse/feature/patientsPages/view/patient_footer_view.dart';
 import 'package:mediverse/feature/patientsPages/view/patient_profile_view.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'dart:async';
 
 class PatientHomePage extends StatefulWidget {
   final String name;
@@ -19,15 +20,41 @@ class PatientHomePage extends StatefulWidget {
 class _PatientHomePageState extends State<PatientHomePage> {
   final PatientRepository _repository = PatientRepository.instance;
   String patientName = "";
-  PatientBooking? _nextBooking;
   int _totalBookings = 0;
   int _pendingCount = 0;
+  List<PatientDoctor> _featuredDoctors = [];
+  final PageController _pageController = PageController();
+  Timer? _carouselTimer;
 
   @override
   void initState() {
     super.initState();
     patientName = widget.name;
     _loadNextBooking();
+    _startCarousel();
+  }
+
+  @override
+  void dispose() {
+    _carouselTimer?.cancel();
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  void _startCarousel() {
+    _carouselTimer = Timer.periodic(const Duration(seconds: 4), (timer) {
+      if (_featuredDoctors.isNotEmpty) {
+        int nextItem = (_pageController.page?.toInt() ?? 0) + 1;
+        if (nextItem >= _featuredDoctors.length) {
+          nextItem = 0;
+        }
+        _pageController.animateToPage(
+          nextItem,
+          duration: const Duration(milliseconds: 600),
+          curve: Curves.easeInOut,
+        );
+      }
+    });
   }
 
   Future<void> _loadNextBooking() async {
@@ -37,7 +64,12 @@ class _PatientHomePageState extends State<PatientHomePage> {
     setState(() {
       _totalBookings = summary.totalBookings;
       _pendingCount = summary.pendingCount;
-      _nextBooking = summary.latestBooking;
+    });
+    // Fetch doctors for carousel
+    final doctors = await _repository.getAvailableDoctors();
+    if (!mounted) return;
+    setState(() {
+      _featuredDoctors = doctors.take(5).toList();
     });
   }
 
@@ -45,19 +77,20 @@ class _PatientHomePageState extends State<PatientHomePage> {
     final d = DateTime.now();
     const w = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
     const m = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec'
     ];
     return '${w[d.weekday - 1]}, ${m[d.month - 1]} ${d.day}, ${d.year}';
-  }
-
-  Color _statusColor(String? status) {
-    final s = (status ?? '').toLowerCase();
-    if (s.contains('confirm') || s.contains('done')) {
-      return Colors.green.shade700;
-    }
-    if (s.contains('cancel')) return Colors.red.shade700;
-    return Colors.orange.shade800;
   }
 
   @override
@@ -80,8 +113,8 @@ class _PatientHomePageState extends State<PatientHomePage> {
               children: [
                 _quickStatsRow(),
                 _tipBanner(),
-                _chooseDoctorCard(),
-                _bookAppointmentCard(),
+                // _chooseDoctorCard(),
+                _bookingOptionsSection(),
                 _upcomingAppointments(),
                 const SizedBox(height: 88),
               ],
@@ -250,8 +283,8 @@ class _PatientHomePageState extends State<PatientHomePage> {
         decoration: BoxDecoration(
           color: const Color(0xFFEFF7FF),
           borderRadius: BorderRadius.circular(12),
-          border:
-              Border.all(color: const Color(0xFF6B9AC4).withValues(alpha: 0.22)),
+          border: Border.all(
+              color: const Color(0xFF6B9AC4).withValues(alpha: 0.22)),
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -275,149 +308,237 @@ class _PatientHomePageState extends State<PatientHomePage> {
     );
   }
 
-  Widget _bookAppointmentCard() {
-    const accent = Color(0xFF6B9AC4);
+  Widget _bookingOptionsSection() {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(20),
-          onTap: () async {
-            await Get.to(() => const BookAppointmentPage());
-            _loadNextBooking();
-          },
-          child: Ink(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  accent,
-                  const Color(0xFF7AA8D0),
-                ],
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: _bookingOptionCard(
+                  title: 'Physical\nAppointment',
+                  subtitle: 'Clinic visit',
+                  icon: Icons.local_hospital_rounded,
+                  color: const Color(0xFF6B9AC4),
+                  onTap: () async {
+                    await Get.to(() => const BookAppointmentPage(
+                          initialVisitType: 'In-person consultation',
+                        ));
+                    _loadNextBooking();
+                  },
+                ),
               ),
-              borderRadius: BorderRadius.circular(20),
-              boxShadow: [
-                BoxShadow(
-                  color: accent.withOpacity(0.35),
-                  blurRadius: 12,
-                  offset: const Offset(0, 6),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _bookingOptionCard(
+                  title: 'Instant Video\nConsult',
+                  subtitle: 'Online visit',
+                  icon: Icons.videocam_rounded,
+                  color: const Color(0xFF6A9C89),
+                  onTap: () async {
+                    await Get.to(() => const BookAppointmentPage(
+                          initialVisitType: 'Video consultation',
+                        ));
+                    _loadNextBooking();
+                  },
                 ),
-              ],
-            ),
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.25),
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: const Icon(Icons.calendar_month_rounded,
-                      color: Colors.white, size: 28),
-                ),
-                const SizedBox(width: 16),
-                const Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Book an appointment',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                          fontFamily: 'Poppins',
-                        ),
-                      ),
-                      SizedBox(height: 4),
-                      Text(
-                        'Share your details & preferred time with the clinic',
-                        style: TextStyle(
-                          color: Colors.white70,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const Icon(Icons.chevron_right, color: Colors.white),
-              ],
-            ),
+              ),
+            ],
           ),
+          const SizedBox(height: 12),
+          _bookingOptionCard(
+            title: 'Emergency / SOS',
+            subtitle: 'Immediate medical attention',
+            icon: Icons.emergency_rounded,
+            color: const Color(0xFFE53935),
+            isWide: true,
+            onTap: () {
+              Get.snackbar(
+                'Emergency SOS',
+                'Connecting to emergency services...',
+                backgroundColor: const Color(0xFFFFEBEE),
+                colorText: const Color(0xFFB71C1C),
+                icon: const Icon(Icons.emergency_share, color: Color(0xFFB71C1C)),
+                duration: const Duration(seconds: 4),
+              );
+              // TODO: Navigate to emergency booking or trigger SOS logic
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _bookingOptionCard({
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required Color color,
+    required VoidCallback onTap,
+    bool isWide = false,
+  }) {
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(20),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(20),
+        onTap: onTap,
+        child: Container(
+          width: isWide ? double.infinity : null,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: const Color(0xFFE5EDF6)),
+            boxShadow: [
+              BoxShadow(
+                color: color.withOpacity(0.08),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: isWide
+              ? Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: color.withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Icon(icon, color: color, size: 28),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            title,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                              fontFamily: 'Poppins',
+                            ),
+                          ),
+                          Text(
+                            subtitle,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey.shade600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Icon(Icons.chevron_right, color: color.withOpacity(0.5)),
+                  ],
+                )
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: color.withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(icon, color: color, size: 24),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                        height: 1.2,
+                        fontFamily: 'Poppins',
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                  ],
+                ),
         ),
       ),
     );
   }
 
-  Widget _chooseDoctorCard() {
-    const accent = Color(0xFF6B9AC4);
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-      child: Material(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(16),
-          onTap: () async {
-            await Get.to(() => const PatientDoctorsPage());
-            _loadNextBooking();
-          },
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: const Color(0xFFE5EDF6)),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.03),
-                  blurRadius: 6,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFE8F4FC),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Icon(
-                    Icons.medical_services_outlined,
-                    color: accent,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                const Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Choose a doctor',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontFamily: 'Poppins',
-                          fontSize: 16,
-                        ),
-                      ),
-                      SizedBox(height: 2),
-                      Text(
-                        'Select preferred doctor and then book',
-                        style: TextStyle(fontSize: 12, color: Colors.black54),
-                      ),
-                    ],
-                  ),
-                ),
-                const Icon(Icons.chevron_right, color: Colors.black45),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
+  // Widget _chooseDoctorCard() {
+  //   const accent = Color(0xFF6B9AC4);
+  //   return Padding(
+  //     padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+  //     child: Material(
+  //       color: Colors.white,
+  //       borderRadius: BorderRadius.circular(16),
+  //       child: InkWell(
+  //         borderRadius: BorderRadius.circular(16),
+  //         onTap: () async {
+  //           await Get.to(() => const PatientDoctorsPage());
+  //           _loadNextBooking();
+  //         },
+  //         child: Container(
+  //           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+  //           decoration: BoxDecoration(
+  //             borderRadius: BorderRadius.circular(16),
+  //             border: Border.all(color: const Color(0xFFE5EDF6)),
+  //             boxShadow: [
+  //               BoxShadow(
+  //                 color: Colors.black.withValues(alpha: 0.03),
+  //                 blurRadius: 6,
+  //                 offset: const Offset(0, 2),
+  //               ),
+  //             ],
+  //           ),
+  //           child: Row(
+  //             children: [
+  //               Container(
+  //                 padding: const EdgeInsets.all(10),
+  //                 decoration: BoxDecoration(
+  //                   color: const Color(0xFFE8F4FC),
+  //                   borderRadius: BorderRadius.circular(10),
+  //                 ),
+  //                 child: const Icon(
+  //                   Icons.medical_services_outlined,
+  //                   color: accent,
+  //                 ),
+  //               ),
+  //               const SizedBox(width: 12),
+  //               const Expanded(
+  //                 child: Column(
+  //                   crossAxisAlignment: CrossAxisAlignment.start,
+  //                   children: [
+  //                     Text(
+  //                       'Choose a doctor',
+  //                       style: TextStyle(
+  //                         fontWeight: FontWeight.bold,
+  //                         fontFamily: 'Poppins',
+  //                         fontSize: 16,
+  //                       ),
+  //                     ),
+  //                     SizedBox(height: 2),
+  //                     Text(
+  //                       'Select preferred doctor and then book',
+  //                       style: TextStyle(fontSize: 12, color: Colors.black54),
+  //                     ),
+  //                   ],
+  //                 ),
+  //               ),
+  //               const Icon(Icons.chevron_right, color: Colors.black45),
+  //             ],
+  //           ),
+  //         ),
+  //       ),
+  //     ),
+  //   );
+  // }
 
   Widget _upcomingAppointments() {
     return Container(
@@ -434,8 +555,7 @@ class _PatientHomePageState extends State<PatientHomePage> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text("Doctors",
-                  style: TextStyle(fontWeight: FontWeight.w500)),
+              Text("Doctors", style: TextStyle(fontWeight: FontWeight.w500)),
               TextButton(
                 onPressed: () async {
                   await Get.to(() => const PatientDoctorsPage());
@@ -445,138 +565,189 @@ class _PatientHomePageState extends State<PatientHomePage> {
               ),
             ],
           ),
-          Container(
-            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            width: double.infinity,
-            decoration: BoxDecoration(
-              color: const Color(0xFFF5F7FA), // Soft Whisper White
-              borderRadius: BorderRadius.circular(20),
+          const SizedBox(height: 12),
+          SizedBox(
+            height: 180,
+            child: _featuredDoctors.isEmpty
+                ? _doctorCardPlaceholder()
+                : PageView.builder(
+                    controller: _pageController,
+                    itemCount: _featuredDoctors.length,
+                    itemBuilder: (context, index) {
+                      return _doctorCarouselItem(_featuredDoctors[index]);
+                    },
+                  ),
+          ),
+          if (_featuredDoctors.length > 1) ...[
+            const SizedBox(height: 10),
+            Center(
+              child: AnimatedBuilder(
+                animation: _pageController,
+                builder: (context, child) {
+                  int current = 0;
+                  try {
+                    current = _pageController.page?.round() ?? 0;
+                  } catch (_) {}
+                  return Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: List.generate(
+                      _featuredDoctors.length,
+                      (i) => Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 3),
+                        width: current == i ? 12 : 6,
+                        height: 6,
+                        decoration: BoxDecoration(
+                          color: current == i
+                              ? const Color(0xFF6B9AC4)
+                              : Colors.grey.shade300,
+                          borderRadius: BorderRadius.circular(3),
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
             ),
-            child: Column(
-              children: [
-                Row(
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _doctorCardPlaceholder() {
+    return _doctorCarouselItem(const PatientDoctor(
+      id: '0',
+      name: 'Dr. Shubham Chaudhary',
+      specialty: 'Cardiologist',
+      experience: '10 years',
+      clinic: 'Mediverse Clinic',
+      clinicPhone: '',
+      rating: '4.5',
+    ));
+  }
+
+  Widget _doctorCarouselItem(PatientDoctor d) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: const Color(0xFFF5F7FA), // Soft Whisper White
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 50,
+                height: 50,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE8F4FC),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.medical_information,
+                  size: 32,
+                  color: Color(0xFF9AC6C5),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(
-                      Icons.medical_information,
-                      size: 50,
-                      color: const Color(0xFF9AC6C5),
+                    Text(
+                      d.name,
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            kPatientAppDoctorName,
-                            style: TextStyle(fontWeight: FontWeight.bold),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          Text(
-                            kPatientAppDoctorSpecialty,
-                            style: TextStyle(
-                                fontSize: 10, fontWeight: FontWeight.w500),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          if (_nextBooking != null) ...[
-                            const SizedBox(height: 6),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 8, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: _statusColor(_nextBooking!.status)
-                                    .withValues(alpha: 0.15),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Text(
-                                _nextBooking!.status,
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w600,
-                                  color: _statusColor(_nextBooking!.status),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
+                    Text(
+                      d.specialty,
+                      style: const TextStyle(
+                          fontSize: 10, fontWeight: FontWeight.w500),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        const Icon(Icons.star_rounded,
+                            color: Colors.amber, size: 14),
+                        const SizedBox(width: 4),
+                        Text(
+                          d.rating,
+                          style: const TextStyle(
+                              fontSize: 11, fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          d.experience,
+                          style: TextStyle(
+                              fontSize: 11, color: Colors.grey.shade600),
+                        ),
+                      ],
                     ),
                   ],
                 ),
-                if (_nextBooking != null &&
-                    _nextBooking!.symptomsReason.isNotEmpty) ...[
-                  const SizedBox(height: 12),
-                  Text(
-                    'Reason: ${_nextBooking!.symptomsReason}',
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey.shade700,
-                      fontStyle: FontStyle.italic,
-                    ),
-                  ),
-                ],
-                SizedBox(height: 20),
-                Container(
-                  padding: EdgeInsets.symmetric(horizontal: 12),
+              ),
+            ],
+          ),
+          const Spacer(),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Expanded(
                   child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Icon(
-                              Icons.calendar_month,
-                              size: 20,
-                              color: const Color(0xFF9AC6C5),
-                            ),
-                            SizedBox(width: 10),
-                            Expanded(
-                              child: Text(
-                                _nextBooking != null
-                                    ? "${_nextBooking!.preferredDate} · ${_nextBooking!.preferredTime}"
-                                    : "No booking yet — tap Book above",
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.grey.shade700,
-                                ),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ],
-                        ),
+                      const Icon(
+                        Icons.location_on_rounded,
+                        size: 16,
+                        color: Color(0xFF9AC6C5),
                       ),
-                      SizedBox(width: 8),
-                      GestureDetector(
-                        onTap: () async {
-                          await Get.to(() => const PatientDoctorsPage());
-                          _loadNextBooking();
-                        },
-                        child: Container(
-                          padding: EdgeInsets.symmetric(
-                              vertical: 8, horizontal: 10),
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(20),
-                            color: const Color(0xFF6B9AC4),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          d.clinic,
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Colors.grey.shade700,
                           ),
-                          child: Text(
-                            "View doctors",
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                     ],
                   ),
-                )
+                ),
+                const SizedBox(width: 8),
+                GestureDetector(
+                  onTap: () async {
+                    await Get.to(() => const PatientDoctorsPage());
+                    _loadNextBooking();
+                  },
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(20),
+                      color: const Color(0xFF6B9AC4),
+                    ),
+                    child: const Text(
+                      "Book now",
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
               ],
             ),
           )

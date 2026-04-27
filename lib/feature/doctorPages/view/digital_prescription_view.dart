@@ -2,6 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import 'doctor_footer_view.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
+import 'package:path_provider/path_provider.dart';
+import 'dart:io';
+import '../../../common/services/storage_service.dart';
 
 class DigitalPrescriptionView extends StatefulWidget {
   final String? patientId;
@@ -73,6 +79,117 @@ class _DigitalPrescriptionViewState extends State<DigitalPrescriptionView> {
         _notesController.text = 'Avoid spicy food. Eat light meals.';
       }
     });
+  }
+
+  Future<void> _generateAndSavePdf() async {
+    if (_medicinesController.text.isEmpty) {
+      Get.snackbar(
+        "Error",
+        "Please add required details before generating Rx",
+        backgroundColor: Colors.red.shade100,
+        colorText: Colors.red.shade900,
+      );
+      return;
+    }
+
+    try {
+      final pdf = pw.Document();
+
+      pdf.addPage(
+        pw.Page(
+          pageFormat: PdfPageFormat.a4,
+          build: (pw.Context context) {
+            return pw.Padding(
+              padding: const pw.EdgeInsets.all(20),
+              child: pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.Header(
+                    level: 0,
+                    child: pw.Text("Digital Prescription",
+                        style: pw.TextStyle(
+                            fontSize: 24, fontWeight: pw.FontWeight.bold)),
+                  ),
+                  pw.SizedBox(height: 20),
+                  pw.Text("Patient Details",
+                      style: pw.TextStyle(
+                          fontSize: 18, fontWeight: pw.FontWeight.bold)),
+                  pw.Divider(),
+                  pw.Text("Name: ${_patientNameController.text}"),
+                  pw.Text("Age: ${_ageController.text}"),
+                  pw.Text("Gender: $_selectedGender"),
+                  pw.SizedBox(height: 20),
+                  pw.Text("Consultation Details",
+                      style: pw.TextStyle(
+                          fontSize: 18, fontWeight: pw.FontWeight.bold)),
+                  pw.Divider(),
+                  pw.Text("Symptoms: ${_symptomsController.text}"),
+                  pw.Text("Diagnosis: ${_diagnosisController.text}"),
+                  pw.SizedBox(height: 20),
+                  pw.Text("Prescription",
+                      style: pw.TextStyle(
+                          fontSize: 18, fontWeight: pw.FontWeight.bold)),
+                  pw.Divider(),
+                  pw.Text("Medicines:"),
+                  pw.Paragraph(text: _medicinesController.text),
+                  pw.SizedBox(height: 10),
+                  pw.Text("Notes:"),
+                  pw.Paragraph(text: _notesController.text),
+                  pw.SizedBox(height: 40),
+                  pw.Align(
+                    alignment: pw.Alignment.centerRight,
+                    child: pw.Column(
+                      children: [
+                        pw.SizedBox(
+                          width: 150,
+                          child: pw.Divider(thickness: 1),
+                        ),
+                        pw.Text("Doctor's Signature"),
+                      ],
+                    ),
+                  ),
+                  pw.Spacer(),
+                  pw.Align(
+                    alignment: pw.Alignment.center,
+                    child: pw.Text("Generated via Mediverse",
+                        style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey)),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+      );
+
+      final output = await getApplicationDocumentsDirectory();
+      final fileName = "Prescription_${_patientNameController.text.replaceAll(' ', '_')}_${DateTime.now().millisecondsSinceEpoch}.pdf";
+      final file = File("${output.path}/$fileName");
+      await file.writeAsBytes(await pdf.save());
+
+      // Save to StorageService
+      final storage = await StorageService.getInstance();
+      await storage.addPatientFile(widget.patientId ?? 'unknown', fileName, file.path);
+
+      Get.snackbar(
+        "Success",
+        "Digital Prescription generated & saved successfully!",
+        backgroundColor: const Color(0xFFC4DAD2),
+        colorText: Colors.black87,
+        icon: const Icon(Icons.check_circle, color: Colors.green),
+      );
+
+      // Offer to share/print
+      await Printing.layoutPdf(
+          onLayout: (PdfPageFormat format) async => pdf.save());
+
+    } catch (e) {
+      Get.snackbar(
+        "Error",
+        "Failed to generate PDF: $e",
+        backgroundColor: Colors.red.shade100,
+        colorText: Colors.red.shade900,
+      );
+    }
   }
 
   @override
@@ -166,26 +283,7 @@ class _DigitalPrescriptionViewState extends State<DigitalPrescriptionView> {
               width: double.infinity,
               height: 55,
               child: ElevatedButton.icon(
-                onPressed: () {
-                  // Simulate PDF Generation
-                  if (_medicinesController.text.isEmpty) {
-                    Get.snackbar(
-                      "Error",
-                      "Please add required details before generating Rx",
-                      backgroundColor: Colors.red.shade100,
-                      colorText: Colors.red.shade900,
-                    );
-                    return;
-                  }
-
-                  Get.snackbar(
-                    "Success",
-                    "Digital Prescription generated & saved successfully!",
-                    backgroundColor: const Color(0xFFC4DAD2),
-                    colorText: Colors.black87,
-                    icon: const Icon(Icons.check_circle, color: Colors.green),
-                  );
-                },
+                onPressed: _generateAndSavePdf,
                 icon: const Icon(Icons.picture_as_pdf, color: Colors.white),
                 label: Text(
                   'generate_pdf'.tr,

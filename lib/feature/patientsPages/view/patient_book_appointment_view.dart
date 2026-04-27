@@ -14,11 +14,13 @@ const String kPatientClinicPhone = '+91 7900464524';
 class BookAppointmentPage extends StatefulWidget {
   final String doctorName;
   final String doctorSpecialty;
+  final String? initialVisitType;
 
   const BookAppointmentPage({
     super.key,
     this.doctorName = kPatientAppDoctorName,
     this.doctorSpecialty = kPatientAppDoctorSpecialty,
+    this.initialVisitType,
   });
 
   @override
@@ -44,7 +46,8 @@ class _BookAppointmentPageState extends State<BookAppointmentPage> {
 
   String _gender = 'Male';
   String _bloodGroup = 'O+';
-  String _visitType = 'In-person consultation';
+  String _visitMode = 'In-person';
+  String _appointmentType = 'New patient';
   DateTime? _preferredDate;
   String? _selectedSlot;
   bool _slotsLoading = false;
@@ -62,13 +65,8 @@ class _BookAppointmentPageState extends State<BookAppointmentPage> {
     'AB-',
     'Unknown'
   ];
-  static const _visitTypes = [
-    'In-person consultation',
-    'Follow-up visit',
-    'New patient',
-    'Video consultation',
-    'Urgent / same-day',
-  ];
+  static const _visitModes = ['In-person', 'Video'];
+  static const _appointmentTypes = ['Follow-up', 'New patient', 'Urgent / Same-day'];
   @override
   void initState() {
     super.initState();
@@ -84,6 +82,13 @@ class _BookAppointmentPageState extends State<BookAppointmentPage> {
     _allergies = TextEditingController();
     _lastVisit = TextEditingController();
     _symptoms = TextEditingController();
+    if (widget.initialVisitType != null) {
+      if (widget.initialVisitType!.toLowerCase().contains('video')) {
+        _visitMode = 'Video';
+      } else {
+        _visitMode = 'In-person';
+      }
+    }
     _loadProfile();
   }
 
@@ -183,7 +188,7 @@ class _BookAppointmentPageState extends State<BookAppointmentPage> {
       doctorSpecialty: widget.doctorSpecialty,
       preferredDate: dateStr,
       preferredTime: timeStr,
-      visitType: _visitType,
+      visitType: '$_visitMode - $_appointmentType',
       symptomsReason: _symptoms.text.trim(),
       status: 'Pending',
       submittedAt: DateTime.now().toIso8601String(),
@@ -447,18 +452,49 @@ class _BookAppointmentPageState extends State<BookAppointmentPage> {
                   hint: 'Approx. date or clinic'),
             ),
             const SizedBox(height: 20),
-            _sectionTitle('Appointment', Icons.event_available_outlined),
+            _sectionTitle('Visit mode', Icons.meeting_room_outlined),
+            Row(
+              children: _visitModes.map((mode) {
+                final isSel = _visitMode == mode;
+                return Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    child: ChoiceChip(
+                      label: Center(
+                          child: Text(mode,
+                              style: TextStyle(
+                                  color: isSel ? Colors.white : Colors.black87,
+                                  fontWeight: FontWeight.bold))),
+                      selected: isSel,
+                      onSelected: (val) {
+                        if (val) setState(() => _visitMode = mode);
+                      },
+                      selectedColor: accent,
+                      backgroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          side: BorderSide(
+                              color: isSel ? accent : Colors.grey.shade300)),
+                      showCheckmark: false,
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 16),
+            _sectionTitle('Appointment type', Icons.list_alt_outlined),
             DropdownButtonFormField<String>(
               isExpanded: true,
-              value: _visitType,
-              decoration: _dec('Visit type'),
-              items: _visitTypes
+              value: _appointmentType,
+              decoration: _dec('Select type'),
+              items: _appointmentTypes
                   .map((t) => DropdownMenuItem(
                         value: t,
                         child: Text(t, overflow: TextOverflow.ellipsis),
                       ))
                   .toList(),
-              onChanged: (v) => setState(() => _visitType = v ?? _visitType),
+              onChanged: (v) =>
+                  setState(() => _appointmentType = v ?? _appointmentType),
             ),
             const SizedBox(height: 12),
             OutlinedButton.icon(

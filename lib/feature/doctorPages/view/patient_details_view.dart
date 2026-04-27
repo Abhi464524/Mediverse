@@ -695,6 +695,40 @@ class _PatientDetailsState extends State<PatientDetails> {
             ),
           ),
           const SizedBox(height: 16),
+          // List existing prescriptions
+          if (_attachments.any((f) => f['name']?.startsWith('Prescription_') ?? false)) ...[
+            const Text(
+              "Previous Prescriptions:",
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: Colors.black87,
+                fontFamily: 'Poppins',
+              ),
+            ),
+            const SizedBox(height: 8),
+            ..._attachments
+                .where((f) => f['name']?.startsWith('Prescription_') ?? false)
+                .map((file) {
+              final name = file['name'] ?? '';
+              final path = file['path'] ?? '';
+              final ts = file['ts'] ?? '';
+              return ListTile(
+                contentPadding: EdgeInsets.zero,
+                dense: true,
+                leading: Icon(Icons.picture_as_pdf, color: _accentColor, size: 20),
+                title: Text(name,
+                    style: const TextStyle(
+                        fontFamily: 'Poppins', fontSize: 13, fontWeight: FontWeight.w500)),
+                subtitle: Text(ts,
+                    style: TextStyle(
+                        fontFamily: 'Poppins', fontSize: 11, color: Colors.grey.shade600)),
+                trailing: Icon(Icons.open_in_new, size: 18, color: _accentColor),
+                onTap: path.isNotEmpty ? () => OpenFilex.open(path) : null,
+              );
+            }).toList(),
+            const SizedBox(height: 16),
+          ],
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(

@@ -114,6 +114,21 @@ class AppointmentsPageState extends State<AppointmentsPage> {
     return DateTime.now().isAfter(appTime);
   }
 
+  final Set<String> _persistedPrescriptions = {};
+
+  Future<void> _loadPrescriptionStatus() async {
+    try {
+      final storage = await StorageService.getInstance();
+      for (final app in appointments) {
+        final files = storage.getPatientFiles(app.id);
+        if (files.any((f) => f['name']?.startsWith('Prescription_') ?? false)) {
+          _persistedPrescriptions.add(app.id);
+        }
+      }
+      if (mounted) setState(() {});
+    } catch (_) {}
+  }
+
   DateTime _dateOnly(DateTime value) =>
       DateTime(value.year, value.month, value.day);
 
@@ -139,6 +154,7 @@ class AppointmentsPageState extends State<AppointmentsPage> {
 
     _fetchAppointments();
     _loadPersistedStatuses();
+    _loadPrescriptionStatus();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _jumpToSelectedWeek(animate: false);
@@ -710,6 +726,11 @@ class AppointmentsPageState extends State<AppointmentsPage> {
                                         const SizedBox(width: 6),
                                         const Icon(Icons.warning_amber_rounded,
                                             size: 18, color: Colors.orange),
+                                      ],
+                                      if (_persistedPrescriptions.contains(appointment.id)) ...[
+                                        const SizedBox(width: 8),
+                                        const Icon(Icons.picture_as_pdf,
+                                            size: 16, color: Color(0xFF6A9C89)),
                                       ],
                                     ],
                                   ),
